@@ -64,24 +64,27 @@ This repository contains the firmware and complete architecture for the **FoloTo
 
 ---
 
-## 📦 Pre-built Firmware Downloads
+## 📦 Pre-built Firmware Download
 
-> Ready-to-flash binaries. No ESP-IDF toolchain required.
-> All `.bin` files are SHA-256 verified. **For personal study and reference only — please do not redistribute.**
+> Ready-to-flash merged image. No ESP-IDF toolchain required.
+> Merged image (bootloader + partition table + application), **flash at offset `0x0`** with a single command.
+> **For personal study and reference only — please do not redistribute.**
 
 | File | Size | SHA-256 |
 | --- | --- | --- |
-| `FoloToy-AI-Passport-full.bin` (all-in-one image) | 2.66 MB | `c2a0178e...d803e3f` |
-| `FoloToy-AI-Passport.bin` (app only) | 2.61 MB | `fc9e26f1...d815c12` |
-| `merged-binary.bin` (merged image) | 1.77 MB | `6a1d7bed...7dd7a56` |
-| `partition-table.bin` (partition table) | 3.0 KB | `a98e0784...b1b5e07c` |
-| `bootloader.bin` (second-stage bootloader) | 20.5 KB | `4a21d256...9092f209` |
+| `FoloToy-AI-Passport-full.bin` | 2.66 MB | `c2a0178e1760ccde00a629a2d18bdcfb2ec70c1e25a9f8e2b135ad5aad803e3f` |
 
-**Full SHA-256 + flashing instructions**: [`build/firmware/README.md`](build/firmware/README.md)
+**Flash command**:
+
+```bash
+esptool.py --chip esp32c3 --port /dev/ttyUSB0 write_flash 0x0 FoloToy-AI-Passport-full.bin
+```
+
+**Full instructions**: [`build/firmware/README.md`](build/firmware/README.md)
 
 **Download entry**: [GitHub Releases → v1.0.0-main](https://github.com/kilng235/folotoy-ai-passport/releases/tag/v1.0.0-main)
 
-> These artifacts are also tracked under [`build/firmware/`](build/firmware/) in this repository, so they can be fetched directly:
+> Or download directly from the repo:
 >
 > ```bash
 > curl -L -o FoloToy-AI-Passport-full.bin \

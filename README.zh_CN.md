@@ -64,27 +64,29 @@
 
 ---
 
-## 📦 预编译固件下载（Flash Artifacts）
+## 📦 预编译固件下载（仅一体化镜像）
 
 > 直接下载使用，无需自行编译 ESP-IDF 工程。
-> 所有 `.bin` 均经过 SHA-256 校验发布，**仅供个人学习与参考，请勿二次分发。**
+> 合并镜像（bootloader + 分区表 + 应用程序），**从 `0x0` 偏移一键烧录**。
+> **仅供个人学习与参考，请勿二次分发。**
 
 | 文件 | 大小 | SHA-256 |
 | --- | --- | --- |
-| `FoloToy-AI-Passport-full.bin`（一体化镜像） | 2.66 MB | `c2a0178e...d803e3f` |
-| `FoloToy-AI-Passport.bin`（仅 App） | 2.61 MB | `fc9e26f1...d815c12` |
-| `merged-binary.bin`（合并镜像） | 1.77 MB | `6a1d7bed...7dd7a56` |
-| `partition-table.bin`（分区表） | 3.0 KB | `a98e0784...b1b5e07c` |
-| `bootloader.bin`（二级引导） | 20.5 KB | `4a21d256...9092f209` |
+| `FoloToy-AI-Passport-full.bin` | 2.66 MB | `c2a0178e1760ccde00a629a2d18bdcfb2ec70c1e25a9f8e2b135ad5aad803e3f` |
 
-**完整 SHA-256 与烧录说明**：[`build/firmware/README.md`](build/firmware/README.md)
+**烧录命令**：
+
+```bash
+esptool.py --chip esp32c3 --port /dev/ttyUSB0 write_flash 0x0 FoloToy-AI-Passport-full.bin
+```
+
+**完整说明**：[`build/firmware/README.md`](build/firmware/README.md)
 
 **下载入口**：[GitHub Releases → v1.0.0-main](https://github.com/kilng235/folotoy-ai-passport/releases/tag/v1.0.0-main)
 
-> 这些预编译产物同时保留在仓库 [`build/firmware/`](build/firmware/) 目录中，可通过 Git 直接下载：
+> 也可通过 Git 直接下载：
 >
 > ```bash
-> # 直接通过 Git 下载完整仓库中的预编译固件（需要 git-lfs 或 raw 下载）
 > curl -L -o FoloToy-AI-Passport-full.bin \
 >   https://raw.githubusercontent.com/kilng235/folotoy-ai-passport/main/build/firmware/FoloToy-AI-Passport-full.bin
 > ```
