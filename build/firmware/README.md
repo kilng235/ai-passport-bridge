@@ -1,3 +1,7 @@
+<p align="right">
+  <a href="README.zh_CN.md">简体中文</a> · <strong>English</strong>
+</p>
+
 # Firmware Artifacts
 
 This directory contains pre-built firmware binaries for the FoloToy AI Passport
@@ -22,9 +26,9 @@ individual files.
 
 ```bash
 esptool.py --chip esp32c3 --port /dev/ttyUSB0 write_flash \
-    0x0       build/bootloader/bootloader.bin \
-    0x8000    build/partition_table/partition-table.bin \
-    0x10000   build/FoloToy-AI-Passport.bin
+    0x0       bootloader.bin \
+    0x8000    partition-table.bin \
+    0x10000   FoloToy-AI-Passport.bin
 ```
 
 ## ⚠️ Asset Copyright
@@ -39,4 +43,5 @@ The **Desk-pet** pixel sprite assets packaged inside the firmware (see
 > desk-pet assets if you build a derivative firmware based on this codebase.
 
 All other source code in this repository is released under the
-[MIT License](../LICENSE).
+[MIT License](../../LICENSE).
+
