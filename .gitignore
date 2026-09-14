@@ -1,5 +1,8 @@
 # Build artifacts and binaries
 build/
+!build/firmware/
+!build/firmware/*.bin
+!build/firmware/*.md
 managed_components/
 *.bin
 *.elf
