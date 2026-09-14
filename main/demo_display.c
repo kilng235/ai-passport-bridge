@@ -2,6 +2,7 @@
 // 用 LVGL 铺纯色(而非底层 draw_bitmap),这样和菜单共用同一套屏幕管理。
 #include "demo.h"
 #include "bsp_display.h"
+#include "power_idle.h"
 #include "ui_pixel.h"
 #include "lvgl.h"
 
@@ -31,6 +32,7 @@ static void refresh(void) {
 void demo_display_enter(void) {
     s_color_idx = 0;
     s_bl_idx = 0;
+    power_idle_set_enabled(false);   // 本页手动测亮度,关闭全局空闲熄屏
     bsp_display_backlight(BL_LEVELS[s_bl_idx]);
 
     s_scr = ui_pixel_screen_create("DISPLAY");
@@ -46,6 +48,7 @@ void demo_display_enter(void) {
 
 void demo_display_exit(void) {
     bsp_display_backlight(100);          // 退出时恢复全亮,免得菜单看不见
+    power_idle_set_enabled(true);
     if (s_scr) { lv_obj_delete(s_scr); s_scr = NULL; s_swatch = s_info = s_mascot = NULL; }
 }
 

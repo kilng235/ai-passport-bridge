@@ -370,9 +370,9 @@ Run the static gate first, then the firmware gate:
 ./tools/validate.sh
 ```
 
-The static gate requires Python 3, a C compiler, `curl`, `tar`, and a SHA-256
-tool. It downloads a checksum-pinned `actionlint` release into `/tmp` when one is
-not installed. The firmware gate is the preferred build path. It uses an
+The static gate requires Python 3, a C compiler, Node.js >= 18 (the
+notification-bridge host test), `curl`, `tar`, and a SHA-256 tool. It downloads a
+checksum-pinned `actionlint` release into `/tmp` when one is not installed. The firmware gate is the preferred build path. It uses an
 isolated temporary build and produces the verified `0x0` image at:
 
 ```text

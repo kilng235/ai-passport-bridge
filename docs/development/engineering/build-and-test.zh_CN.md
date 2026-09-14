@@ -40,6 +40,12 @@ cc -std=c11 -Wall -Wextra -Werror -Imain \
 /tmp/test_ui_pixel_math
 ```
 
+通知桥共享库也有宿主测试（Node >= 18，无第三方依赖），由静态门禁执行：
+
+```bash
+node tests/test_passport_bridge_state.mjs
+```
+
 统一验证入口：
 
 ```bash

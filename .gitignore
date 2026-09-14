@@ -1,6 +1,28 @@
+# Build artifacts and binaries
 build/
+managed_components/
+*.bin
+*.elf
+*.map
+*.hex
+*.dis
+*.pyc
+__pycache__/
+
+# IDF configuration cache
 sdkconfig
 sdkconfig.old
-managed_components/
+dependencies.lock.old
+
+# IDE & OS
 .vscode/
 .idea/
+.DS_Store
+Thumbs.db
+
+# Secrets and local configurations
+.env
+.env.*
+*.pem
+*.key
+*.token

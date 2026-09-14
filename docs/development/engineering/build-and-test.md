@@ -42,6 +42,13 @@ cc -std=c11 -Wall -Wextra -Werror -Imain \
 /tmp/test_ui_pixel_math
 ```
 
+The notification-bridge shared library also has a host test, run by the static
+gate (Node >= 18, no third-party dependencies):
+
+```bash
+node tests/test_passport_bridge_state.mjs
+```
+
 Use the unified validation entry point:
 
 ```bash

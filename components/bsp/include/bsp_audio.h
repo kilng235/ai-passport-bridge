@@ -6,6 +6,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // 初始化 codec 与 I2S。内部会调 bsp_i2c_init()(幂等),无需外部先调。
 esp_err_t bsp_audio_init(void);
 
@@ -22,3 +26,15 @@ esp_err_t bsp_audio_read(void *pcm, size_t bytes);
 
 // 输出音量 0..100(%)。
 void bsp_audio_set_volume(uint8_t percent);
+
+// 挂起音频通路以省电:关闭 codec,内部会 disable I2S 通道(时钟停),
+// codec 与后级功放的静态电流随之下降。仅在"不播放"时调用。
+esp_err_t bsp_audio_suspend(void);
+
+// 从 bsp_audio_suspend() 恢复:重新使能 I2S 通道;codec 会在下次
+// bsp_audio_set_format() 时按需重开(无需手动 open)。
+esp_err_t bsp_audio_resume(void);
+
+#ifdef __cplusplus
+}
+#endif

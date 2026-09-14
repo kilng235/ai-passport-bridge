@@ -1,0 +1,4 @@
+## main 组件的第三方依赖;板级依赖见 components/bsp/idf_component.yml。
+dependencies:
+  idf: ">=5.5.3,<5.6.0"
+  espressif/mdns: "^1.8.0"

@@ -50,7 +50,7 @@ static int advertise(void)
     if (rc != 0) return rc;
 
     struct ble_gap_adv_params params = { 0 };
-    params.conn_mode = BLE_GAP_CONN_MODE_NON;
+    params.conn_mode = BLE_GAP_CONN_MODE_UND;
     params.disc_mode = BLE_GAP_DISC_MODE_GEN;
     rc = ble_gap_adv_start(s_addr_type, NULL, BLE_HS_FOREVER, &params, gap_event, NULL);
     if (rc == 0) s_state = BLE_DEMO_ADVERTISING;
@@ -61,6 +61,16 @@ static int gap_event(struct ble_gap_event *event, void *arg)
 {
     (void)arg;
     if (event->type == BLE_GAP_EVENT_ADV_COMPLETE && s_start_requested) {
+        int rc = advertise();
+        if (rc != 0) {
+            s_error = rc;
+            s_state = BLE_DEMO_FAILED;
+        }
+    } else if (event->type == BLE_GAP_EVENT_CONNECT) {
+        ESP_LOGI(TAG, "central connected, status=%d", event->connect.status);
+    } else if (event->type == BLE_GAP_EVENT_DISCONNECT && s_start_requested) {
+        ESP_LOGI(TAG, "central disconnected, reason=%d; restart advertising",
+                 event->disconnect.reason);
         int rc = advertise();
         if (rc != 0) {
             s_error = rc;

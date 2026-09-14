@@ -168,3 +168,19 @@ esp_err_t bsp_audio_read(void *pcm, size_t bytes) {
 void bsp_audio_set_volume(uint8_t percent) {
     if (s_dev) esp_codec_dev_set_out_vol(s_dev, percent);
 }
+
+esp_err_t bsp_audio_suspend(void) {
+    if (!s_dev || !s_opened) return ESP_OK;   // 未打开则无需挂起
+    // close 内部会 disable I2S 通道,时钟停 -> codec/功放静态电流下降。
+    esp_codec_dev_close(s_dev);
+    s_opened = false;
+    return ESP_OK;
+}
+
+esp_err_t bsp_audio_resume(void) {
+    if (!s_dev) return ESP_ERR_INVALID_STATE;
+    // close 已把通道退回 READY;先 enable 以满足下次 open 内部 disable 的合法性。
+    if (s_tx) i2s_channel_enable(s_tx);
+    if (s_rx) i2s_channel_enable(s_rx);
+    return ESP_OK;
+}

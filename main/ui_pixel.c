@@ -1,4 +1,6 @@
 #include "ui_pixel.h"
+#include "ui_theme.h"
+#include "ui_font.h"
 
 static void start_blink(lv_obj_t *eye);
 
@@ -18,19 +20,17 @@ static lv_obj_t *block(lv_obj_t *parent, int x, int y, int w, int h, uint32_t co
 lv_obj_t *ui_pixel_label(lv_obj_t *parent, const char *text,
                          const lv_font_t *font, uint32_t color)
 {
+#if LV_FONT_HANSANS_14_CJK
+    // 按文本内容确定性选字:含中文 → CJK 子集,纯英文 → Montserrat。
+    // 不依赖内置字体的 fallback(该路径在本环境下实际未生效导致中文空白)。
+    if (font == &lv_font_montserrat_14) font = ui_font_pick_14(text);
+    else if (font == &lv_font_montserrat_20) font = ui_font_pick_20(text);
+#endif
     lv_obj_t *label = lv_label_create(parent);
     lv_label_set_text(label, text);
     lv_obj_set_style_text_font(label, font, 0);
     lv_obj_set_style_text_color(label, lv_color_hex(color), 0);
     return label;
-}
-
-static void add_cloud(lv_obj_t *parent, int x, int y)
-{
-    block(parent, x + 1, y + 7, 43, 10, UI_INK);
-    block(parent, x + 5, y + 4, 35, 10, 0xFFFFFF);
-    block(parent, x + 12, y, 10, 9, 0xFFFFFF);
-    block(parent, x + 27, y + 1, 9, 8, 0xFFFFFF);
 }
 
 lv_obj_t *ui_pixel_screen_create(const char *title)
@@ -41,30 +41,24 @@ lv_obj_t *ui_pixel_screen_create(const char *title)
     lv_obj_set_style_border_width(scr, 0, 0);
     lv_obj_set_style_pad_all(scr, 0, 0);
 
-    add_cloud(scr, 188, 8);
-    block(scr, 0, 286, 240, 34, UI_GRASS);
-    block(scr, 0, 286, 240, 4, 0xA7D93E);
-    for (int x = 0; x < 240; x += 30) {
-        block(scr, x, 312, 18, 8, UI_GRASS_DARK);
-        block(scr, x + 18, 316, 12, 4, 0x75452E);
-    }
-
-    block(scr, 9, 12, 151, 33, UI_INK);
-    lv_obj_t *plate = block(scr, 5, 8, 151, 33, UI_PAPER);
-    lv_obj_set_style_border_color(plate, lv_color_hex(UI_INK), 0);
-    lv_obj_set_style_border_width(plate, 3, 0);
-    lv_obj_t *heading = ui_pixel_label(plate, title, &lv_font_montserrat_20, UI_INK);
-    lv_obj_center(heading);
+    // 深色主题页头(leo-radio 设置页样式):居中标题 + 1px 网格分隔线。
+    // 面板等子元素从 y=54 起,页头占据 0..42。
+    lv_obj_t *heading = ui_pixel_label(scr, title, &lv_font_montserrat_20, UI_INK);
+    lv_obj_set_width(heading, 216);
+    lv_obj_set_pos(heading, 12, 12);
+    lv_obj_set_style_text_align(heading, LV_TEXT_ALIGN_CENTER, 0);
+    ui_theme_divider(scr, 12, 42, 216);
     return scr;
 }
 
 lv_obj_t *ui_pixel_panel_create(lv_obj_t *parent, int x, int y, int w, int h,
                                 uint32_t color)
 {
-    block(parent, x + 5, y + 6, w, h, UI_INK);
+    // leo-radio 面板:纯色表面 + 1px 网格边框,替代原"墨色阴影+4px 描边"。
     lv_obj_t *panel = block(parent, x, y, w, h, color);
-    lv_obj_set_style_border_color(panel, lv_color_hex(UI_INK), 0);
-    lv_obj_set_style_border_width(panel, 4, 0);
+    lv_obj_set_style_border_color(panel, lv_color_hex(UI_GRASS), 0);
+    lv_obj_set_style_border_width(panel, 1, 0);
+    lv_obj_set_style_radius(panel, 8, 0);
     lv_obj_set_style_pad_all(panel, 7, 0);
     return panel;
 }
@@ -143,8 +137,8 @@ void ui_pixel_mascot_jump(lv_obj_t *mascot)
 
 void ui_pixel_set_selected(lv_obj_t *panel, bool selected, bool enabled)
 {
-    uint32_t color = !enabled ? 0x78909C : (selected ? UI_YELLOW : UI_PAPER);
+    // leo-radio 的 Wi-Fi 列表选中样式:暗琥珀底/常规面板底;不可用则次级面板。
+    uint32_t color = !enabled ? UI_GRASS_DARK
+                     : selected ? UI_YELLOW : UI_PAPER;
     lv_obj_set_style_bg_color(panel, lv_color_hex(color), 0);
-    lv_obj_set_style_border_color(panel,
-        lv_color_hex(selected ? 0xFFFFFF : UI_INK), 0);
 }

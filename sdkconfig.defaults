@@ -22,6 +22,14 @@ CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
 CONFIG_LV_COLOR_DEPTH_16=y
 CONFIG_LV_FONT_MONTSERRAT_14=y
 CONFIG_LV_FONT_MONTSERRAT_20=y
+# 中文:按"源码实际用到的字"从思源黑体生成 14px 子集(main/lv_font_hansans_14_cjk.c),
+# 经 main/ui_font.c 作为 Montserrat 的回退,实现中英混排。源字体来自 LVGL 组件:
+#   lv_font_conv --font managed_components/lvgl__lvgl/scripts/built_in_font/SourceHanSansSC-Normal.otf \
+#     --size 14 --bpp 4 --symbols font/symbols.txt --format lvgl --lv-include lvgl.h \
+#     -o main/lv_font_hansans_14_cjk.c
+# 注意:lv_font_conv 默认对字形位图做 RLE 压缩(bitmap_format=1),必须同时打开
+# LVGL 的压缩字体解码,否则 get_glyph_bitmap 直接返回 NULL → 屏上中文全部空白。
+CONFIG_LV_USE_FONT_COMPRESSED=y
 # LVGL 内置 malloc 池大小(KB)。它是独立静态区、不与系统堆共享,配大了会白白占用 RAM。
 # 本 demo UI 简单,24KB 足够;若自建复杂界面出现绘制卡死/看门狗,调大此值。
 CONFIG_LV_MEM_SIZE_KILOBYTES=24
@@ -29,14 +37,31 @@ CONFIG_LV_MEM_SIZE_KILOBYTES=24
 # --- 系统 ---
 CONFIG_FREERTOS_HZ=1000
 
-# --- Bluetooth LE / NimBLE ---
-# ESP32-C3 仅支持 BLE；示例只启用单连接 peripheral 所需的最小 host 配置。
-CONFIG_BT_ENABLED=y
-CONFIG_BT_NIMBLE_ENABLED=y
-CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
-CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
-CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
-CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
-CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
-CONFIG_BT_NIMBLE_HOST_BASED_PRIVACY=n
-CONFIG_BT_NIMBLE_NVS_PERSIST=n
+# --- 电源管理:DFS 调频 + 自动浅睡 ---
+# 开关由 main.c 的 esp_pm_configure() 设定(160/80MHz + light_sleep_enable)。
+# 屏幕亮时经背光持 NO_LIGHT_SLEEP 锁(见 bsp_display.c),防止 LEDC 背光在浅睡中停摆;
+# 熄屏后放锁,空闲即可自动浅睡,把待机电流从 ~25mA 降到个位数 mA。
+CONFIG_PM_ENABLE=y
+CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
+CONFIG_PM_SLP_IRAM_OPT=y
+CONFIG_PM_RTOS_IDLE_OPT=y
+# ESP32-C3 的 USB-Serial-JTAG 在浅睡下无法工作。插着 USB 时禁止自动浅睡,
+# 否则设备熄屏进入浅睡后 esptool/网页烧录器会报 "No serial data received"(连不上)。
+# 拔掉 USB 后仍可正常浅睡,不影响功耗目标。
+CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION=y
+
+# --- 按键 ---
+# 长按判定阈值(ms)。默认 1.5s 太久,容易被当成单击(单击=进入选中项,看着像"刷新")。
+CONFIG_BUTTON_LONG_PRESS_TIME_MS=800
+
+# --- Bluetooth ---
+# 当前固件无 BLE 页面(demo_ble 未编入 SRCS、菜单也无入口);禁用整棵蓝牙栈以省 flash/RAM。
+# CONFIG_BT_ENABLED is not set
+
+# Wi-Fi 缓冲:小而稳,给配网扫描与通知服务的 HTTP 留出内存。
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=6
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=16
+CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=16
+CONFIG_ESP_WIFI_RX_BA_WIN=6
+CONFIG_ESP_WIFI_MGMT_SBUF_NUM=8
+# CONFIG_ESP_WIFI_ENABLE_WPA3_SAE is not set

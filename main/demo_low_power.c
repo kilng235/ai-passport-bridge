@@ -2,6 +2,7 @@
 // 不使用按键唤醒：仓库尚无板级唤醒电路证据。
 #include "demo.h"
 #include "bsp_display.h"
+#include "power_idle.h"
 #include "ui_pixel.h"
 
 #include "esp_attr.h"
@@ -102,6 +103,7 @@ static void sleep_task(void *arg)
 
 void demo_low_power_enter(void)
 {
+    power_idle_set_enabled(false);   // 本页自行控制休眠/背光,关闭全局空闲熄屏
     s_scr = ui_pixel_screen_create("LOW POWER");
     lv_obj_t *panel = ui_pixel_panel_create(s_scr, 14, 54, 212, 190, UI_PAPER);
     s_status = lv_label_create(panel);
@@ -150,6 +152,7 @@ void demo_low_power_exit(void)
     }
     s_busy = false;
     bsp_display_backlight(100);
+    power_idle_set_enabled(true);
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
     if (s_scr) {
         lv_obj_delete(s_scr);

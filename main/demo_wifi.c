@@ -1,13 +1,11 @@
 // main/demo_wifi.c —— STA 模式扫描附近 AP，不连接网络、不保存凭证。
 #include "demo.h"
-#include "demo_radio.h"
+#include "app_net.h"
 #include "ui_pixel.h"
 
 #include "esp_event.h"
 #include "esp_log.h"
-#include "esp_netif.h"
 #include "esp_wifi.h"
-#include "esp_wifi_default.h"
 #include "lvgl.h"
 #include <stdio.h>
 #include <string.h>
@@ -28,12 +26,9 @@ static lv_obj_t *s_scr;
 static lv_obj_t *s_status;
 static lv_obj_t *s_results;
 static lv_timer_t *s_timer;
-static esp_netif_t *s_sta_netif;
 static esp_event_handler_instance_t s_scan_handler;
 static volatile wifi_demo_state_t s_state;
 static volatile esp_err_t s_error;
-static bool s_wifi_initialized;
-static bool s_wifi_started;
 static bool s_handler_registered;
 
 static void scan_done(void *arg, esp_event_base_t base, int32_t id, void *data)
@@ -47,9 +42,7 @@ static void scan_done(void *arg, esp_event_base_t base, int32_t id, void *data)
 
 static esp_err_t start_scan(void)
 {
-    if (!s_wifi_started) return ESP_ERR_INVALID_STATE;
-
-    esp_err_t err = esp_wifi_scan_start(NULL, false);
+    esp_err_t err = app_net_scan_start();
     if (err == ESP_OK) {
         s_state = WIFI_DEMO_SCANNING;
     } else {
@@ -62,41 +55,22 @@ static esp_err_t start_scan(void)
 static esp_err_t wifi_start(void)
 {
     s_state = WIFI_DEMO_STARTING;
-    esp_err_t err = demo_radio_nvs_prepare();
-    if (err != ESP_OK) goto fail;
-    err = demo_radio_network_prepare();
-    if (err != ESP_OK) goto fail;
 
-    s_sta_netif = esp_netif_create_default_wifi_sta();
-    if (!s_sta_netif) {
-        err = ESP_ERR_NO_MEM;
-        goto fail;
-    }
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    err = esp_wifi_init(&cfg);
+    // Wi-Fi 由 app_net 常驻持有,这里只复用同一实例发起扫描。
+    esp_err_t err = app_net_start();
     if (err != ESP_OK) goto fail;
-    s_wifi_initialized = true;
 
     err = esp_event_handler_instance_register(WIFI_EVENT, WIFI_EVENT_SCAN_DONE,
                                               scan_done, NULL, &s_scan_handler);
     if (err != ESP_OK) goto fail;
     s_handler_registered = true;
 
-    err = esp_wifi_set_storage(WIFI_STORAGE_RAM);
-    if (err != ESP_OK) goto fail;
-    err = esp_wifi_set_mode(WIFI_MODE_STA);
-    if (err != ESP_OK) goto fail;
-    err = esp_wifi_start();
-    if (err != ESP_OK) goto fail;
-    s_wifi_started = true;
-
     return start_scan();
 
 fail:
     s_error = err;
     s_state = WIFI_DEMO_FAILED;
-    ESP_LOGE(TAG, "Wi-Fi 初始化失败: %s", esp_err_to_name(err));
+    ESP_LOGE(TAG, "Wi-Fi 扫描启动失败: %s", esp_err_to_name(err));
     return err;
 }
 
@@ -155,23 +129,11 @@ static void tick(lv_timer_t *timer)
 
 static void wifi_stop(void)
 {
-    if (s_wifi_started) {
-        esp_wifi_scan_stop();
-        esp_wifi_stop();
-        s_wifi_started = false;
-    }
+    // 只注销本页的扫描回调;共享 Wi-Fi 由 app_net 持有,不能在此停止。
     if (s_handler_registered) {
         esp_event_handler_instance_unregister(WIFI_EVENT, WIFI_EVENT_SCAN_DONE,
                                               s_scan_handler);
         s_handler_registered = false;
-    }
-    if (s_wifi_initialized) {
-        esp_wifi_deinit();
-        s_wifi_initialized = false;
-    }
-    if (s_sta_netif) {
-        esp_netif_destroy_default_wifi(s_sta_netif);
-        s_sta_netif = NULL;
     }
     s_state = WIFI_DEMO_OFF;
 }

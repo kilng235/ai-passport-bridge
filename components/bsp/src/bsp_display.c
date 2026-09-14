@@ -10,12 +10,20 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#if CONFIG_PM_ENABLE
+#include "esp_pm.h"
+#endif
 
 static const char *TAG = "bsp_disp";
 
 static esp_lcd_panel_handle_t    s_panel;
 static esp_lcd_panel_io_handle_t s_io;
 static bool                      s_bl_ready;
+#if CONFIG_PM_ENABLE
+// 屏幕亮(背光>0)时持此锁禁止浅睡:LEDC 属数字外设,浅睡会停背光 PWM。
+static esp_pm_lock_handle_t      s_bl_pm_lock;
+static bool                      s_bl_pm_locked;
+#endif
 
 // ---------------------------------------------------------------------------
 // ST7789P3 厂商专属初始化序列(porch / power / gamma)。
@@ -131,6 +139,12 @@ esp_err_t bsp_display_init(void) {
     esp_lcd_panel_disp_on_off(s_panel, true);                    // 0x29 DISPON
 
     backlight_init();
+#if CONFIG_PM_ENABLE
+    if (esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "lcd_bl", &s_bl_pm_lock) != ESP_OK) {
+        ESP_LOGW(TAG, "背光 PM 锁创建失败,浅睡时背光可能闪");
+        s_bl_pm_lock = NULL;
+    }
+#endif
     ESP_LOGI(TAG, "显示就绪 %dx%d", BSP_LCD_W, BSP_LCD_H);
     return ESP_OK;
 }
@@ -142,6 +156,18 @@ esp_lcd_panel_io_handle_t bsp_display_io(void) { return s_io; }
 void bsp_display_backlight(uint8_t percent) {
     if (!s_bl_ready) return;
     if (percent > 100) percent = 100;
+#if CONFIG_PM_ENABLE
+    // 背光>0 视为"屏幕在用":持锁禁止浅睡;熄屏(0)放锁,空闲即可自动浅睡。
+    if (s_bl_pm_lock) {
+        if (percent > 0 && !s_bl_pm_locked) {
+            esp_pm_lock_acquire(s_bl_pm_lock);
+            s_bl_pm_locked = true;
+        } else if (percent == 0 && s_bl_pm_locked) {
+            esp_pm_lock_release(s_bl_pm_lock);
+            s_bl_pm_locked = false;
+        }
+    }
+#endif
     uint32_t max_duty = (1u << BSP_BL_LEDC_RES) - 1u;
     uint32_t duty = (max_duty * percent) / 100u;
     ledc_set_duty(BSP_BL_LEDC_MODE, BSP_BL_LEDC_CHANNEL, duty);

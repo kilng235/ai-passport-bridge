@@ -28,6 +28,27 @@ run_static_checks() {
         tests/test_ui_pixel_math.c main/ui_pixel_math.c \
         -o "${test_dir}/test_ui_pixel_math"
     "${test_dir}/test_ui_pixel_math"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_app_cfg.c main/app_cfg.c \
+        -o "${test_dir}/test_app_cfg"
+    "${test_dir}/test_app_cfg"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_power_idle.c main/power_idle_logic.c \
+        -o "${test_dir}/test_power_idle"
+    "${test_dir}/test_power_idle"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_brightness_logic.c main/brightness_logic.c \
+        -o "${test_dir}/test_brightness_logic"
+    "${test_dir}/test_brightness_logic"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_app_notify_logic.c main/app_notify_logic.c \
+        -o "${test_dir}/test_app_notify_logic"
+    "${test_dir}/test_app_notify_logic"
+    if ! command -v node >/dev/null 2>&1; then
+        echo "ERROR: node >= 18 is required for the bridge host tests (tools/lib)." >&2
+        return 1
+    fi
+    node tests/test_passport_bridge_state.mjs
     python3 tests/test_verify_firmware.py
     rm -rf "${test_dir}"
     echo "Host tests: PASS"
