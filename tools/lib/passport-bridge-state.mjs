@@ -80,10 +80,11 @@ export function eventIntent(event) {
   const p = event?.data ?? event?.properties ?? {};
   const info = p.info ?? p.session;
   const sid = asStr(info?.id ?? p.sessionID ?? p.form?.sessionID);
+  const parentID = asStr(info?.parentID ?? p.parentID ?? "");
   switch (normalizeEventType(event?.type)) {
     case "session.created":
     case "session.updated":
-      return { sid, name: asStr(info?.title), kind: null, removed: false };
+      return { sid, parentID, name: asStr(info?.title), kind: null, removed: false };
 
     case "session.status": {
       const st = p.status?.type;   // "idle" | "busy" | "retry"

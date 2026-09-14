@@ -374,13 +374,14 @@ export default Plugin.define({
       }, lib.DONE_DECAY_MS));
     };
 
-    // created/updated:记录会话名(会话可能在本次事件里首次出现)。
-    const rememberName = (sid, name) => {
+    // created/updated:记录会话名及父会话 ID(用于区分子代理会话)。
+    const rememberName = (sid, name, parentID = "") => {
       if (!sid) return;
       const state = lib.loadState();
       const sessions = lib.sourceSessions(state, SOURCE);
       const cur = sessions[sid] || { kind: "idle", name: "", at: 0 };
       if (name) cur.name = name;
+      if (parentID) cur.parentID = parentID;
       sessions[sid] = cur;
       lib.saveState(state, SOURCE);
       if (cur.kind !== "idle") scheduleSend();
@@ -486,7 +487,7 @@ export default Plugin.define({
         if (!intent || !intent.sid) return;
         if (intent.removed) { removeSession(intent.sid); return; }
         if (event.type === "session.created" || event.type === "session.updated") {
-          rememberName(intent.sid, intent.name);
+          rememberName(intent.sid, intent.name, intent.parentID);
         }
         if (intent.kind === "done") markDone(intent.sid);
         else if (intent.kind) setKind(intent.sid, intent.kind);
@@ -528,15 +529,20 @@ export default Plugin.define({
     // (本 workspace) 自己会话列表里的最近一个 — SDK 已按更新时间排序 — 避免
     // 注入到别的 workspace 的会话(全局桥状态是跨工作区合并的,会误选)。
     // 桥状态作为 SDK 调用失败时的回退。
+    // 注入到"最近活跃的用户主会话(Root Session)",而不是子代理(subagent)。
+    // 若最近活跃的是子代理会话,则顺藤摸瓜找到其 parentID(主会话)注入,
+    // 坚决不向子代理会话注入 Prompt,防止破坏子任务或导致指令跑偏。
     const injectPrompt = async (text) => {
       if (!ctx.session?.prompt) { log("[PTT Voice] ctx.session.prompt 不可用"); return false; }
       let target = null;
       let targetName = "";
       try {
-        const r = await ctx.client.session.list();
+        const r = await ctx.client?.session?.list?.();
         const list = Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : null);
         if (list && list.length) {
-          target = list[0];
+          // 优先过滤掉带 parentID 的子代理会话
+          const rootSessions = list.filter(s => !s.parentID);
+          target = rootSessions[0] || list[0];
           targetName = target.title || target.name || target.id || "";
         }
       } catch (e) {
@@ -545,17 +551,31 @@ export default Plugin.define({
       if (!target) {
         const state = lib.loadState();
         const sessions = lib.sourceSessions(state, SOURCE);
-        const targetSid = Object.keys(sessions)
-          .sort((a, b) => (sessions[b]?.at || 0) - (sessions[a]?.at || 0))[0] || null;
-        if (targetSid) {
-          target = { id: targetSid, title: sessions[targetSid]?.name };
+        // 先按最近时间排序
+        const sortedSids = Object.keys(sessions)
+          .sort((a, b) => (sessions[b]?.at || 0) - (sessions[a]?.at || 0));
+
+        // 1. 优先找没有 parentID 的顶层交互会话
+        let chosenSid = sortedSids.find(sid => !sessions[sid]?.parentID);
+
+        // 2. 如果全都有 parentID(或最近的是子代理),顺着 parentID 追溯根会话
+        if (!chosenSid && sortedSids.length) {
+          let curr = sortedSids[0];
+          while (curr && sessions[curr]?.parentID) {
+            curr = sessions[curr].parentID;
+          }
+          chosenSid = curr || sortedSids[0];
+        }
+
+        if (chosenSid) {
+          target = { id: chosenSid, title: sessions[chosenSid]?.name };
           targetName = target.title || target.id;
         }
       }
       if (!target) { log("[PTT Voice] 没有可注入的会话"); return false; }
       // OpenCode V2 的 PromptInput 字段是 text(不是 prompt)。
       await ctx.session.prompt({ sessionID: target.id, text });
-      log(`[PTT Voice] 已向会话 ${target.id}${targetName ? ` 「${targetName}」` : ""} 注入 Prompt`);
+      log(`[PTT Voice] 已向主会话 ${target.id}${targetName ? ` 「${targetName}」` : ""} 注入 Prompt`);
       return true;
     };
 
@@ -620,7 +640,14 @@ export default Plugin.define({
           const j = JSON.parse(body || "{}");
           if (typeof j.text === "string" && j.text) text = j.text;
         } catch { /* ignore */ }
-        if (!text) text = "对讲机语音输入测试";
+        if (!text) {
+          // 识别为空时绝不注入占位文本(旧版会塞入"对讲机语音输入测试"污染会话),
+          // 回 422 让设备端显示"识别失败",用户按 OK 重录即可。
+          log("[PTT Voice] 提交被拒: 识别文本为空");
+          voiceBuf = { id: null, pcm: Buffer.alloc(0), text: "" };
+          jsonReply(res, 422, { ok: false, error: "empty text" });
+          return;
+        }
         const ok = await injectPrompt(text);
         voiceBuf = { id: null, pcm: Buffer.alloc(0), text: "" };
         jsonReply(res, 200, { ok, text });
@@ -711,8 +738,10 @@ export default Plugin.define({
     }
 
     return () => {
-      // 语音服务是进程级单例,不随实例销毁;只解绑本实例的处理函数。
-      if (globalThis.__passportVoiceHandler === voiceHandler) globalThis.__passportVoiceHandler = null;
+      // 只有在没有新的插件实例接替时，才置空全局处理函数，防止热重载瞬间把已就绪的语音服务打入 503
+      if (globalThis.__passportVoiceHandler === voiceHandler && !globalThis.__passportNotifyInstance) {
+        globalThis.__passportVoiceHandler = null;
+      }
       controller.abort();
       for (const t of decayTimers.values()) clearTimeout(t);
       decayTimers.clear();
