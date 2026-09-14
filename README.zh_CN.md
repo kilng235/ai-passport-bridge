@@ -17,6 +17,21 @@
    - **桌面宠物（Desk Pet）**：与通知状态实时联动的 96×96 LVGL 像素动画轮播（Idle/Running/Done/Alert）。
    - **无线对讲机（Voice Prompt）**：硬件按键录音上传 -> PC 端 ASR 语音转文字 -> 设备端确认/撤销/追加后注入 Agent 会话。
    - **安全机制**：局域网白名单过滤 + 可选 `PASSPORT_VOICE_TOKEN` 双向鉴权。
+
+2. **🚨 关于语音对讲（Voice Prompt）的兼容性说明**
+   - **当前仅适配 OpenCode V2 版本**：语音注入端点 `/api/voice-commit` 基于 OpenCode V2 的 SDK（`ctx.client.session.list()`、`ctx.client.session.prompt()`）实现会话检索与指令注入，V1 旧版架构不兼容。
+   - **接入流程（OpenCode V2）**：
+     1. 将 `tools/opencode/passport-notify.js` 与 `tools/lib/passport-bridge-state.mjs` 拷贝到 OpenCode 插件目录：
+        - 全局：`~/.config/opencode/plugins/passport-notify.js` + `~/.config/opencode/plugins/lib/passport-bridge-state.mjs`
+        - 或项目级：`.opencode/plugins/`（保持目录结构一致）
+     2. 重启 OpenCode（插件在启动时加载）。
+     3. 设置环境变量：
+        ```bash
+        export PASSPORT_URL=http://<设备IP>/notify  # 或使用 PASSPORT_HOST=folopassport.local
+        export PASSPORT_VOICE_TOKEN=<自定义Token>   # 可选,设备配网页填入同值
+        ```
+     4. 设备端：进入**通知/桌宠**页，`OK` 短按开始录音 -> 再次短按结束 -> PC 端 ASR 转写 -> 设备显示文本并等待确认（`OK` 发送 / `上` 继续说 / `下` 撤销 / 双击 `OK` 重录）。
+   - **协议端点**：`POST /api/voice-prompt`（只识别，返回 `{text}`）、`POST /api/voice-commit`（注入）、`POST /api/voice-cancel`（丢弃）。详细字段与返回格式见 `tools/opencode/README.zh_CN.md`。
 2. **网络与配网**
    - 内置 SoftAP Web 配网门户（`192.168.4.1`），支持 Wi-Fi 与大模型 API Key 动态设置。
    - 全局后台驻留网络服务（`app_net`），开机自动连网并广播 mDNS（`folopassport.local`）。

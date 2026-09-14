@@ -17,6 +17,21 @@ This repository contains the firmware and complete architecture for the **FoloTo
    - **Desk Pet**: 96×96 animated pixel companion synchronized with live agent states (Idle/Running/Done/Alert).
    - **Voice Walkie-Talkie (Voice Prompt)**: Hardware button recording -> PC-side ASR transcription -> on-device confirmation before injection into active sessions.
    - **Security**: Device IP allowlist + optional shared `PASSPORT_VOICE_TOKEN` authentication.
+
+2. **🚨 Voice Prompt Compatibility Notice**
+   - **Currently only compatible with OpenCode V2**: The voice injection endpoint `/api/voice-commit` relies on the OpenCode V2 SDK (`ctx.client.session.list()`, `ctx.client.session.prompt()`) for session lookup and prompt injection. The legacy V1 architecture is **not** supported.
+   - **Integration Steps (OpenCode V2)**:
+     1. Copy `tools/opencode/passport-notify.js` and `tools/lib/passport-bridge-state.mjs` to the OpenCode plugins directory:
+        - Global: `~/.config/opencode/plugins/passport-notify.js` + `~/.config/opencode/plugins/lib/passport-bridge-state.mjs`
+        - Or per-project: `.opencode/plugins/` (keep the directory layout)
+     2. Restart OpenCode (the plugin is loaded on startup).
+     3. Configure environment variables:
+        ```bash
+        export PASSPORT_URL=http://<device-IP>/notify   # or PASSPORT_HOST=folopassport.local
+        export PASSPORT_VOICE_TOKEN=<shared-token>      # optional; set the same value in the device setup portal
+        ```
+     4. On the device: open the **Notify / Desk-pet** page. Short-press `OK` to start recording, short-press again to stop — the PC runs ASR, the device shows the transcript and waits for confirmation (`OK` send / `UP` continue / `DOWN` discard / double-`OK` re-record).
+   - **Protocol Endpoints**: `POST /api/voice-prompt` (ASR only, returns `{text}`), `POST /api/voice-commit` (inject), `POST /api/voice-cancel` (discard). See `tools/opencode/README.md` for full payload and response schema.
 2. **Connectivity & Web Portal**
    - Built-in SoftAP Web Portal (`192.168.4.1`) for dynamic Wi-Fi and LLM API Key configuration.
    - Background network daemon (`app_net`) with auto-reconnect and mDNS advertising (`folopassport.local`).
