@@ -20,6 +20,9 @@
 
 2. **🚨 关于语音对讲（Voice Prompt）的兼容性说明**
    - **当前仅适配 OpenCode V2 版本**：语音注入端点 `/api/voice-commit` 基于 OpenCode V2 的 SDK（`ctx.client.session.list()`、`ctx.client.session.prompt()`）实现会话检索与指令注入，V1 旧版架构不兼容。
+   - **依赖外部 ASR 服务**：设备端固件只负责**录音 + 传输裸 PCM 音频**（通过 `POST /api/voice-prompt` 上传），**本身不内置 ASR 模型**。语音转写（ASR）由 PC 端 OpenCode 插件调用大模型厂商的语音识别 API 完成，默认使用 **MiniMax 的 `asr-1.0` 模型**，端点为 `https://api.minimaxi.com/v1/speech_to_text`。
+     - ASR 模型可由环境变量 `PASSPORT_ASR_MODEL`、`PASSPORT_ASR_URL`、`PASSPORT_ASR_LANG` 自定义（详见 `tools/opencode/README.zh_CN.md`）。
+     - 使用前需要确保对应 ASR 服务可用并已配置相应 API Key。
    - **接入流程（OpenCode V2）**：
      1. 将 `tools/opencode/passport-notify.js` 与 `tools/lib/passport-bridge-state.mjs` 拷贝到 OpenCode 插件目录：
         - 全局：`~/.config/opencode/plugins/passport-notify.js` + `~/.config/opencode/plugins/lib/passport-bridge-state.mjs`
@@ -29,9 +32,12 @@
         ```bash
         export PASSPORT_URL=http://<设备IP>/notify  # 或使用 PASSPORT_HOST=folopassport.local
         export PASSPORT_VOICE_TOKEN=<自定义Token>   # 可选,设备配网页填入同值
+        export PASSPORT_ASR_MODEL=asr-1.0           # 可选,默认 MiniMax ASR 模型
+        export PASSPORT_ASR_URL=https://api.minimaxi.com/v1/speech_to_text
+        export PASSPORT_ASR_LANG=zh                 # 语言提示,默认中文
         ```
-     4. 设备端：进入**通知/桌宠**页，`OK` 短按开始录音 -> 再次短按结束 -> PC 端 ASR 转写 -> 设备显示文本并等待确认（`OK` 发送 / `上` 继续说 / `下` 撤销 / 双击 `OK` 重录）。
-   - **协议端点**：`POST /api/voice-prompt`（只识别，返回 `{text}`）、`POST /api/voice-commit`（注入）、`POST /api/voice-cancel`（丢弃）。详细字段与返回格式见 `tools/opencode/README.zh_CN.md`。
+     4. 设备端：进入**通知/桌宠**页，`OK` 短按开始录音 -> 再次短按结束 -> PC 端调用 ASR 服务转写 -> 设备显示文本并等待确认（`OK` 发送 / `上` 继续说 / `下` 撤销 / 双击 `OK` 重录）。
+   - **协议端点**：`POST /api/voice-prompt`（上传音频 + 调用 ASR，返回 `{text}`）、`POST /api/voice-commit`（注入）、`POST /api/voice-cancel`（丢弃）。详细字段与返回格式见 `tools/opencode/README.zh_CN.md`。
 2. **网络与配网**
    - 内置 SoftAP Web 配网门户（`192.168.4.1`），支持 Wi-Fi 与大模型 API Key 动态设置。
    - 全局后台驻留网络服务（`app_net`），开机自动连网并广播 mDNS（`folopassport.local`）。

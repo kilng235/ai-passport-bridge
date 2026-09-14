@@ -20,6 +20,9 @@ This repository contains the firmware and complete architecture for the **FoloTo
 
 2. **🚨 Voice Prompt Compatibility Notice**
    - **Currently only compatible with OpenCode V2**: The voice injection endpoint `/api/voice-commit` relies on the OpenCode V2 SDK (`ctx.client.session.list()`, `ctx.client.session.prompt()`) for session lookup and prompt injection. The legacy V1 architecture is **not** supported.
+   - **Requires an external ASR service**: The device firmware only handles **recording + streaming raw PCM audio** (via `POST /api/voice-prompt`); it does **NOT include an embedded ASR model**. Speech-to-text is performed by the PC-side OpenCode plugin, which by default calls the **MiniMax `asr-1.0` model** at `https://api.minimaxi.com/v1/speech_to_text`.
+     - The ASR model, endpoint URL, and language hint can be customized through `PASSPORT_ASR_MODEL`, `PASSPORT_ASR_URL`, and `PASSPORT_ASR_LANG` (see `tools/opencode/README.md`).
+     - Make sure the target ASR service is reachable and the corresponding API key is configured before use.
    - **Integration Steps (OpenCode V2)**:
      1. Copy `tools/opencode/passport-notify.js` and `tools/lib/passport-bridge-state.mjs` to the OpenCode plugins directory:
         - Global: `~/.config/opencode/plugins/passport-notify.js` + `~/.config/opencode/plugins/lib/passport-bridge-state.mjs`
@@ -29,9 +32,12 @@ This repository contains the firmware and complete architecture for the **FoloTo
         ```bash
         export PASSPORT_URL=http://<device-IP>/notify   # or PASSPORT_HOST=folopassport.local
         export PASSPORT_VOICE_TOKEN=<shared-token>      # optional; set the same value in the device setup portal
+        export PASSPORT_ASR_MODEL=asr-1.0               # optional, default MiniMax ASR model
+        export PASSPORT_ASR_URL=https://api.minimaxi.com/v1/speech_to_text
+        export PASSPORT_ASR_LANG=zh                     # language hint, default Chinese
         ```
-     4. On the device: open the **Notify / Desk-pet** page. Short-press `OK` to start recording, short-press again to stop — the PC runs ASR, the device shows the transcript and waits for confirmation (`OK` send / `UP` continue / `DOWN` discard / double-`OK` re-record).
-   - **Protocol Endpoints**: `POST /api/voice-prompt` (ASR only, returns `{text}`), `POST /api/voice-commit` (inject), `POST /api/voice-cancel` (discard). See `tools/opencode/README.md` for full payload and response schema.
+     4. On the device: open the **Notify / Desk-pet** page. Short-press `OK` to start recording, short-press again to stop — the PC calls the ASR service, the device shows the transcript and waits for confirmation (`OK` send / `UP` continue / `DOWN` discard / double-`OK` re-record).
+   - **Protocol Endpoints**: `POST /api/voice-prompt` (upload audio + ASR, returns `{text}`), `POST /api/voice-commit` (inject), `POST /api/voice-cancel` (discard). See `tools/opencode/README.md` for full payload and response schema.
 2. **Connectivity & Web Portal**
    - Built-in SoftAP Web Portal (`192.168.4.1`) for dynamic Wi-Fi and LLM API Key configuration.
    - Background network daemon (`app_net`) with auto-reconnect and mDNS advertising (`folopassport.local`).
