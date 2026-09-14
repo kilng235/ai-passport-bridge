@@ -17,6 +17,7 @@
 #include "app_voice.h"
 #include "brightness_logic.h"   // BRIGHTNESS_DEFAULT:开机套用已存亮度
 #include "power_idle.h"
+#include "power_idle_logic.h"
 #include "ui_pixel.h"
 #include "ui_theme.h"
 #include "ui_font.h"
@@ -47,7 +48,7 @@ static const demo_entry_t PAGES[PAGE_COUNT] = {
     [PAGE_QUOTA]      = { "Token Quota", demo_quota_enter,      demo_quota_exit,      demo_quota_key      },
     [PAGE_NOTIFY]     = { "通知/桌宠",   demo_notify_enter,     demo_notify_exit,     demo_notify_key     },
     [PAGE_WIFI]       = { "Wi-Fi",       demo_wifi_enter,       demo_wifi_exit,       demo_wifi_key       },
-    [PAGE_LOW_POWER]  = { "Low Power",   demo_low_power_enter,  demo_low_power_exit,  demo_low_power_key  },
+    [PAGE_LOW_POWER]  = { "待机熄屏",    demo_low_power_enter,  demo_low_power_exit,  demo_low_power_key  },
     [PAGE_BRIGHTNESS] = { "亮度",        demo_brightness_enter, demo_brightness_exit, demo_brightness_key },
     [PAGE_SOUND]      = { "提示音",      demo_sound_enter,      demo_sound_exit,      demo_sound_key      },
     [PAGE_PORTAL]     = { "配网",        demo_portal_enter,     demo_portal_exit,     demo_portal_key     },
@@ -78,7 +79,7 @@ static const menu_item_t MAIN_ITEMS[] = {
 };
 static const menu_item_t SETTINGS_ITEMS[] = {
     { "Wi-Fi",   PAGE_WIFI,       -1 },
-    { "低功耗",  PAGE_LOW_POWER,  -1 },
+    { "待机熄屏", PAGE_LOW_POWER,  -1 },
     { "亮度",    PAGE_BRIGHTNESS, -1 },
     { "提示音",  PAGE_SOUND,      -1 },
     { "配网",    PAGE_PORTAL,     -1 },
@@ -305,6 +306,12 @@ void app_main(void)
     bsp_display_backlight(brightness);
     power_idle_init();   // 全局空闲变暗/熄屏
     power_idle_set_on_level(brightness);
+
+    // 加载用户设定的待机/熄屏超时秒数(默认 60s)
+    uint16_t idle_sec = POWER_IDLE_TIMEOUT_60S;
+    if (app_cfg_load_idle_timeout(&idle_sec)) {
+        power_idle_set_timeout_sec(idle_sec);
+    }
 
     // 网络与通知(P1):app_net 单点持有 Wi-Fi;通知服务开机常驻,任意页面可收。
     app_net_init();

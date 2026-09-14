@@ -3,6 +3,7 @@
 // 静音时段:app_beep_play 内查窗口(app_net 的 SNTP 对时后本地时钟可信),只压声音不压亮屏。
 #include "app_beep.h"
 #include "app_beep_logic.h"
+#include "app_voice.h"
 
 #include "bsp_audio.h"
 #include "demo_radio.h"   // demo_radio_nvs_prepare()
@@ -167,6 +168,11 @@ static void beep_task(void *arg)
     for (;;) {
         if (xTaskNotifyWait(0, 0, &kind, portMAX_DELAY) != pdTRUE) continue;
         if (!s_enabled) continue;
+        // 录音/上传期间完全避让:录音独占 codec,beep 若此刻重配采样率
+        // 会拆掉录音上下文(16kHz↔16kHz 同格式才复用,否则 close 重开),
+        // 造成 RX 通道停摆 → 录音读数恒为 0。
+        voice_state_t vs = app_voice_get_state();
+        if (vs == VOICE_RECORDING || vs == VOICE_UPLOADING) continue;
         if (!audio_begin()) continue;
 
         switch ((app_notify_kind_t)kind) {

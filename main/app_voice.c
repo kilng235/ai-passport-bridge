@@ -28,7 +28,7 @@ static const char *TAG = "app_voice";
 
 #define SAMPLE_RATE         16000
 #define CHUNK_SAMPLES       512          // 每块 1KB;仅此占栈
-#define MAX_RECORD_SEC      10
+#define MAX_RECORD_SEC      30
 #define MIN_RECORD_MS       300
 #define VOICE_PORT          8090
 #define VOICE_PATH          "/api/voice-prompt"
@@ -119,12 +119,38 @@ static void voice_worker(void *arg)
         goto done;
     }
 
+    bsp_audio_init();   // 幂等:若 beep 尚未初始化过音频(如开机后未响过铃),此处自建 codec
     bsp_audio_resume();
-    bsp_audio_set_format(SAMPLE_RATE, 16, 1);
+    if (bsp_audio_set_format(SAMPLE_RATE, 16, 1) != ESP_OK) {
+        s_voice_state = VOICE_FAILED;
+        snprintf(s_result_text, sizeof(s_result_text), "麦克风初始化失败");
+        esp_http_client_close(client);
+        esp_http_client_cleanup(client);
+        goto done;
+    }
 
     int16_t chunk[CHUNK_SAMPLES];
     s_audio_len = 0;
+
+    // 预热:丢弃开头 ~400ms(12 块)。ES8311 打开/重开后 ADC 有直流偏移与削波瞬态
+    // (实测 dc≈-7000、peak 顶满),这些垃圾样本若上传会导致 ASR 返回空文本,
+    // 也是"有时能识别、有时空"的根源。预热期不计时、不写入 HTTP。
+    bool mic_ready = true;
+    for (int i = 0; i < 12 && s_voice_state == VOICE_RECORDING; i++) {
+        if (bsp_audio_read(chunk, sizeof(chunk)) != ESP_OK) { mic_ready = false; break; }
+    }
+    if (!mic_ready || s_voice_state != VOICE_RECORDING) {
+        bsp_audio_suspend();
+        s_current_level = 0;
+        s_voice_state = VOICE_FAILED;
+        snprintf(s_result_text, sizeof(s_result_text), "录音时间过短");
+        esp_http_client_close(client);
+        esp_http_client_cleanup(client);
+        goto done;
+    }
+
     s_start_time_us = esp_timer_get_time();
+    int read_errs = 0;             // 连续读失败计数(麦克风/I2S 异常时避免静默空转)
 
     while (s_voice_state == VOICE_RECORDING) {
         if (s_audio_len >= (size_t)SAMPLE_RATE * 2 * MAX_RECORD_SEC) {
@@ -132,9 +158,21 @@ static void voice_worker(void *arg)
             break;
         }
         if (bsp_audio_read(chunk, sizeof(chunk)) == ESP_OK) {
-            if (!chunk_write(client, chunk, sizeof(chunk))) break;
+            read_errs = 0;
+            if (!chunk_write(client, chunk, sizeof(chunk))) {
+                ESP_LOGW(TAG, "音频块写入失败(网络中断),结束录音");
+                s_audio_len = 0;   // 明确标记为传输失败,与"时间过短"区分
+                break;
+            }
             s_audio_len += sizeof(chunk);
             s_current_level = calculate_level(chunk, CHUNK_SAMPLES);
+        } else {
+            read_errs++;
+            if (read_errs >= 10) {   // 连续 10 次(~100ms+)读不到麦克风数据
+                ESP_LOGE(TAG, "麦克风连续读失败 %d 次,放弃本次录音", read_errs);
+                s_audio_len = 0;
+                break;
+            }
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -142,11 +180,11 @@ static void voice_worker(void *arg)
     bsp_audio_suspend();
     s_current_level = 0;
 
-    uint32_t ms = (uint32_t)((esp_timer_get_time() - s_start_time_us) / 1000);
-    if (s_audio_len == 0 || ms < MIN_RECORD_MS) {
+    // 以"实际流式发送的音频字节数"判定有效性(0.3s = 9600 字节),
+    // 比墙钟时间更可靠:预热/瞬态/读失败都不会再混进有效录音。
+    if (s_audio_len < (size_t)SAMPLE_RATE * 2 * MIN_RECORD_MS / 1000) {
         s_voice_state = VOICE_FAILED;
         snprintf(s_result_text, sizeof(s_result_text), "录音时间过短");
-        esp_http_client_write(client, "0\r\n\r\n", 5);
         esp_http_client_close(client);
         esp_http_client_cleanup(client);
         goto done;

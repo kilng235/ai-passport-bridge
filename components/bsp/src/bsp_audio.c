@@ -8,6 +8,8 @@
 #include "es8311_codec.h"
 #include "driver/i2s_std.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 static const char *TAG = "bsp_audio";
 
@@ -17,6 +19,10 @@ static i2s_chan_handle_t      s_tx, s_rx;
 static uint32_t s_hz;
 static uint8_t  s_bits, s_ch;
 static bool     s_opened;
+// 串行化所有 codec/I2S 操作:提示音任务(app_beep)与录音任务(app_voice)并发
+// 调用 suspend/resume/set_format 时曾在 I2S enable/disable 上产生竞态,
+// 导致 RX 通道停在 disabled 状态、录音读数为 0("录音时间过短")。
+static SemaphoreHandle_t s_lock;
 
 static esp_err_t i2s_full_duplex_init(void) {
     i2s_chan_config_t chan = {
@@ -72,10 +78,19 @@ static esp_err_t i2s_full_duplex_init(void) {
 }
 
 esp_err_t bsp_audio_init(void) {
-    if (s_dev) return ESP_OK;
+    if (s_lock) xSemaphoreTake(s_lock, portMAX_DELAY);
+    if (s_dev) {
+        if (s_lock) xSemaphoreGive(s_lock);
+        return ESP_OK;
+    }
+
+    if (!s_lock) s_lock = xSemaphoreCreateMutex();
 
     esp_err_t e = bsp_i2c_init();
-    if (e != ESP_OK) return e;
+    if (e != ESP_OK) {
+        if (s_lock) xSemaphoreGive(s_lock);
+        return e;
+    }
 
     const audio_codec_ctrl_if_t *ctrl = audio_codec_new_i2c_ctrl(&(audio_codec_i2c_cfg_t){
         .port = BSP_I2C_PORT,
@@ -86,15 +101,23 @@ esp_err_t bsp_audio_init(void) {
         ESP_LOGE(TAG, "ES8311 控制口创建失败 —— 用 bsp_i2c_scan() 确认 0x%02X 是否应答;"
                       "检查 SDA=GPIO%d / SCL=GPIO%d 接线与 codec 供电",
                  BSP_I2C_ES8311_ADDR, BSP_I2C_SDA, BSP_I2C_SCL);
+        if (s_lock) xSemaphoreGive(s_lock);
         return ESP_FAIL;
     }
 
-    if ((e = i2s_full_duplex_init()) != ESP_OK) return e;
+    if ((e = i2s_full_duplex_init()) != ESP_OK) {
+        if (s_lock) xSemaphoreGive(s_lock);
+        return e;
+    }
 
     const audio_codec_data_if_t *data = audio_codec_new_i2s_data(&(audio_codec_i2s_cfg_t){
         .port = BSP_I2S_PORT, .tx_handle = s_tx, .rx_handle = s_rx,
     });
-    if (!data) { ESP_LOGE(TAG, "I2S 数据口创建失败"); return ESP_FAIL; }
+    if (!data) {
+        ESP_LOGE(TAG, "I2S 数据口创建失败");
+        if (s_lock) xSemaphoreGive(s_lock);
+        return ESP_FAIL;
+    }
 
     const audio_codec_if_t *codec = es8311_codec_new(&(es8311_codec_cfg_t){
         .ctrl_if     = ctrl,
@@ -109,22 +132,35 @@ esp_err_t bsp_audio_init(void) {
         //   ADCL+DACR 参考模式,单声道读到的那一路是 DAC 参考 → 【录音恒为 0】。
         .no_dac_ref  = true,
     });
-    if (!codec) { ESP_LOGE(TAG, "es8311_codec_new 失败"); return ESP_FAIL; }
+    if (!codec) {
+        ESP_LOGE(TAG, "es8311_codec_new 失败");
+        if (s_lock) xSemaphoreGive(s_lock);
+        return ESP_FAIL;
+    }
 
     s_dev = esp_codec_dev_new(&(esp_codec_dev_cfg_t){
         .dev_type = ESP_CODEC_DEV_TYPE_IN_OUT,
         .codec_if = codec,
         .data_if  = data,
     });
-    if (!s_dev) { ESP_LOGE(TAG, "esp_codec_dev_new 失败"); return ESP_FAIL; }
+    if (!s_dev) {
+        ESP_LOGE(TAG, "esp_codec_dev_new 失败");
+        if (s_lock) xSemaphoreGive(s_lock);
+        return ESP_FAIL;
+    }
 
     ESP_LOGI(TAG, "ES8311 就绪");
+    if (s_lock) xSemaphoreGive(s_lock);
     return ESP_OK;
 }
 
 esp_err_t bsp_audio_set_format(uint32_t hz, uint8_t bits, uint8_t ch) {
     if (!s_dev) return ESP_ERR_INVALID_STATE;
-    if (s_opened && s_hz == hz && s_bits == bits && s_ch == ch) return ESP_OK;   // 同格式复用
+    if (s_lock) xSemaphoreTake(s_lock, portMAX_DELAY);
+    if (s_opened && s_hz == hz && s_bits == bits && s_ch == ch) {   // 同格式复用
+        if (s_lock) xSemaphoreGive(s_lock);
+        return ESP_OK;
+    }
 
     if (s_opened) {
         esp_codec_dev_close(s_dev);
@@ -143,7 +179,11 @@ esp_err_t bsp_audio_set_format(uint32_t hz, uint8_t bits, uint8_t ch) {
         .mclk_multiple = 0,          // 0 → 驱动按默认 256xfs 取 MCLK
     };
     int r = esp_codec_dev_open(s_dev, &fs);
-    if (r != 0) { ESP_LOGE(TAG, "esp_codec_dev_open 失败: %d", r); return ESP_FAIL; }
+    if (r != 0) {
+        ESP_LOGE(TAG, "esp_codec_dev_open 失败: %d", r);
+        if (s_lock) xSemaphoreGive(s_lock);
+        return ESP_FAIL;
+    }
 
     // ⚠ open 之后【不要】手动覆写 ES8311 的时钟分频寄存器(REG01~06):
     //   驱动已按采样率与 MCLK 精确算好,覆写会导致 ADC/DAC 时序错乱、录音回放全是杂音。
@@ -152,16 +192,26 @@ esp_err_t bsp_audio_set_format(uint32_t hz, uint8_t bits, uint8_t ch) {
 
     s_opened = true; s_hz = hz; s_bits = bits; s_ch = ch;
     ESP_LOGI(TAG, "codec 打开 %luHz/%ubit/%uch", (unsigned long)hz, bits, ch);
+    if (s_lock) xSemaphoreGive(s_lock);
     return ESP_OK;
 }
 
 esp_err_t bsp_audio_write(const void *pcm, size_t bytes) {
     if (!s_dev) return ESP_ERR_INVALID_STATE;
-    return esp_codec_dev_write(s_dev, (void *)pcm, bytes) == 0 ? ESP_OK : ESP_FAIL;
+    if (s_lock) xSemaphoreTake(s_lock, portMAX_DELAY);
+    esp_err_t r = esp_codec_dev_write(s_dev, (void *)pcm, bytes) == 0 ? ESP_OK : ESP_FAIL;
+    if (s_lock) xSemaphoreGive(s_lock);
+    return r;
 }
 
 esp_err_t bsp_audio_read(void *pcm, size_t bytes) {
     if (!s_dev) return ESP_ERR_INVALID_STATE;
+    // read 是阻塞调用(最长 32ms 一块),不持锁等待,避免与 beep 抢锁超时;
+    // 但打开状态的检查须与 set_format/suspend 互斥,这里先短暂持锁快照判定。
+    if (s_lock) xSemaphoreTake(s_lock, portMAX_DELAY);
+    bool open_ok = s_opened;
+    if (s_lock) xSemaphoreGive(s_lock);
+    if (!open_ok) return ESP_ERR_INVALID_STATE;
     return esp_codec_dev_read(s_dev, pcm, bytes) == 0 ? ESP_OK : ESP_FAIL;
 }
 
@@ -170,17 +220,25 @@ void bsp_audio_set_volume(uint8_t percent) {
 }
 
 esp_err_t bsp_audio_suspend(void) {
-    if (!s_dev || !s_opened) return ESP_OK;   // 未打开则无需挂起
+    if (!s_dev) return ESP_OK;   // 未打开则无需挂起
+    if (s_lock) xSemaphoreTake(s_lock, portMAX_DELAY);
+    if (!s_opened) {
+        if (s_lock) xSemaphoreGive(s_lock);
+        return ESP_OK;
+    }
     // close 内部会 disable I2S 通道,时钟停 -> codec/功放静态电流下降。
     esp_codec_dev_close(s_dev);
     s_opened = false;
+    if (s_lock) xSemaphoreGive(s_lock);
     return ESP_OK;
 }
 
 esp_err_t bsp_audio_resume(void) {
     if (!s_dev) return ESP_ERR_INVALID_STATE;
+    if (s_lock) xSemaphoreTake(s_lock, portMAX_DELAY);
     // close 已把通道退回 READY;先 enable 以满足下次 open 内部 disable 的合法性。
     if (s_tx) i2s_channel_enable(s_tx);
     if (s_rx) i2s_channel_enable(s_rx);
+    if (s_lock) xSemaphoreGive(s_lock);
     return ESP_OK;
 }

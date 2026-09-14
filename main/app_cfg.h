@@ -46,6 +46,10 @@ bool app_cfg_load(app_cfg_t *cfg);
 bool app_cfg_save_brightness(uint8_t percent);
 bool app_cfg_load_brightness(uint8_t *out_percent);
 
+// 待机与熄屏超时秒数存独立 NVS 整型键(0 = 从不,或 30/60/180 秒)。
+bool app_cfg_save_idle_timeout(uint16_t sec);
+bool app_cfg_load_idle_timeout(uint16_t *out_sec);
+
 // 语音服务共享 Token(独立 NVS 字符串键,同样不进 blob)。空串 = 清除。
 #define APP_CFG_TOKEN_MAX 65
 bool app_cfg_save_voice_token(const char *token);

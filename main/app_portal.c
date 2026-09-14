@@ -36,6 +36,7 @@ static const char *TAG = "app_portal";
 #define NVS_NAMESPACE      "pcfg"
 #define NVS_KEY            "main"
 #define NVS_KEY_BRIGHTNESS "brightness"
+#define NVS_KEY_IDLE_SEC   "idle_sec"
 #define NVS_KEY_VTOKEN     "vtoken"
 
 static httpd_handle_t s_server;
@@ -174,6 +175,33 @@ bool app_cfg_load_brightness(uint8_t *out_percent)
     nvs_close(h);
     if (err != ESP_OK || !brightness_is_valid((int)val)) return false;
     *out_percent = val;
+    return true;
+}
+
+bool app_cfg_save_idle_timeout(uint16_t sec)
+{
+    if (demo_radio_nvs_prepare() != ESP_OK) return false;
+
+    nvs_handle_t h;
+    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h) != ESP_OK) return false;
+    esp_err_t err = nvs_set_u16(h, NVS_KEY_IDLE_SEC, sec);
+    if (err == ESP_OK) err = nvs_commit(h);
+    nvs_close(h);
+    return err == ESP_OK;
+}
+
+bool app_cfg_load_idle_timeout(uint16_t *out_sec)
+{
+    if (!out_sec) return false;
+    if (demo_radio_nvs_prepare() != ESP_OK) return false;
+
+    nvs_handle_t h;
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &h) != ESP_OK) return false;
+    uint16_t val = 0;
+    esp_err_t err = nvs_get_u16(h, NVS_KEY_IDLE_SEC, &val);
+    nvs_close(h);
+    if (err != ESP_OK) return false;
+    *out_sec = val;
     return true;
 }
 

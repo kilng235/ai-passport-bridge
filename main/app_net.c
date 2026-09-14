@@ -164,6 +164,9 @@ esp_err_t app_net_start(void)
     s_wifi_started = true;
     s_desired = true;
 
+    // 默认保持全速低延迟模式，保障流式 chunked 语音录音与即时通知推送 100% 稳定不丢包
+    esp_wifi_set_ps(WIFI_PS_NONE);
+
     app_cfg_t cfg;
     if (app_cfg_load(&cfg) && app_cfg_wifi_ready(&cfg)) {
         wifi_config_t wifi_cfg = {

@@ -1,4 +1,4 @@
-// main/demo_status.c —— 8-bit 经典像素街机风格:通知 ↔ 桌宠（中文 + 像素修饰符）。
+// main/demo_status.c —— 8-bit 经典像素街机风格:通知 ↔ 桌宠 ↔ 语音对讲（中文 + 像素修饰符）。
 // 像素 HUD 对话框 + 方块指示器 + 像素跑马灯。
 #include "demo.h"
 #include "app_net.h"
@@ -21,6 +21,7 @@
 
 #define PANEL_W 240
 #define PANEL_H 320
+#define PAGE_COUNT 3
 #define LIST_ROWS 4
 #define KIND_HOLD_US (5LL * 1000 * 1000)
 
@@ -28,7 +29,7 @@ static const char *TAG = "demo_status";
 
 static lv_obj_t *s_scr;
 static lv_obj_t *s_strip;
-static int s_page;                 // 0 = 通知,1 = 桌宠
+static int s_page;                 // 0 = 通知, 1 = 桌宠, 2 = 语音对讲
 static lv_timer_t *s_timer;
 
 // ---- 通知页控件 ----
@@ -53,11 +54,16 @@ static lv_obj_t *s_pet_clock;
 static app_notify_kind_t s_pet_kind = APP_NOTIFY_IDLE;
 static bool s_pet_have_state;
 
-// ---- 对讲机 (PTT) 弹窗控件 ----
-static lv_obj_t *s_ptt_box;
-static lv_obj_t *s_ptt_title;
-static lv_obj_t *s_ptt_bar;
-static lv_obj_t *s_ptt_hint;
+// ---- 语音对讲页 (PTT) 控件 ----
+static lv_obj_t *s_voice_clock;
+static lv_obj_t *s_voice_tag;
+static lv_obj_t *s_voice_state_lbl;
+static lv_obj_t *s_voice_level_box;
+static lv_obj_t *s_voice_level_bar;
+static lv_obj_t *s_voice_dur_lbl;
+static lv_obj_t *s_voice_text_box;
+static lv_obj_t *s_voice_text_lbl;
+static lv_obj_t *s_voice_hint_lbl;
 
 // ---------------------------------------------------------------- 8-bit 配色与像素标签
 static uint32_t kind_color(app_notify_kind_t k)
@@ -111,7 +117,6 @@ static lv_obj_t *panel_create(int x)
 
 // ---------------------------------------------------------------- 通知页
 static void pet_set_state(app_notify_kind_t k);
-static void ptt_tick(void);
 
 static void notify_apply_kind(app_notify_kind_t k)
 {
@@ -352,6 +357,142 @@ static void pet_panel_tick(void)
     }
 }
 
+// ---------------------------------------------------------------- 语音对讲页
+static void voice_panel_create(lv_obj_t *p)
+{
+    s_voice_tag = ui_theme_label(p, ":: 语音对讲机 ::", 12, 10, 120, UI_THEME_CYAN, ui_font_pick_14(":: 语音对讲机 ::"));
+    s_voice_clock = ui_theme_label(p, "--:--", 134, 10, 94, UI_THEME_TEXT, &lv_font_montserrat_14);
+    lv_obj_set_style_text_align(s_voice_clock, LV_TEXT_ALIGN_RIGHT, 0);
+    ui_theme_divider(p, 12, 34, 216);
+
+    // 状态条 (空闲/录音中/识别中/待确认/已发送)
+    s_voice_state_lbl = ui_theme_label(p, "[ 短按 OK 开始录音 ]", 12, 46, 216, UI_THEME_MUTED, ui_font_pick_14("[ 短按 OK 开始录音 ]"));
+    ui_theme_center(s_voice_state_lbl);
+
+    // 像素声波电平条外框
+    s_voice_level_box = ui_theme_box(p, 16, 76, 208, 40, UI_THEME_PANEL, 0);
+    lv_obj_set_style_border_width(s_voice_level_box, 2, 0);
+    lv_obj_set_style_border_color(s_voice_level_box, lv_color_hex(UI_THEME_GRID), 0);
+
+    s_voice_level_bar = lv_label_create(s_voice_level_box);
+    lv_obj_set_pos(s_voice_level_bar, 0, 10);
+    lv_obj_set_width(s_voice_level_bar, 204);
+    lv_label_set_long_mode(s_voice_level_bar, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_align(s_voice_level_bar, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(s_voice_level_bar, "░░░░░░░░░░");
+    lv_obj_set_style_text_font(s_voice_level_bar, ui_font_pick_14("░"), 0);
+    lv_obj_set_style_text_color(s_voice_level_bar, lv_color_hex(UI_THEME_AMBER), 0);
+
+    s_voice_dur_lbl = ui_theme_label(p, "时长: 0.0s", 16, 122, 208, UI_THEME_MUTED, ui_font_pick_14("时长: 0.0s"));
+
+    // 识别文本大视窗
+    s_voice_text_box = ui_theme_box(p, 16, 144, 208, 116, UI_THEME_PANEL, 0);
+    lv_obj_set_style_border_width(s_voice_text_box, 2, 0);
+    lv_obj_set_style_border_color(s_voice_text_box, lv_color_hex(UI_THEME_GRID_HI), 0);
+
+    lv_obj_t *box_title = lv_label_create(s_voice_text_box);
+    lv_obj_set_pos(box_title, 8, 6);
+    lv_label_set_text(box_title, "▶ 识别结果 (Prompt)");
+    lv_obj_set_style_text_font(box_title, ui_font_pick_14("▶ 识别结果"), 0);
+    lv_obj_set_style_text_color(box_title, lv_color_hex(UI_THEME_MUTED), 0);
+
+    s_voice_text_lbl = lv_label_create(s_voice_text_box);
+    lv_obj_set_pos(s_voice_text_lbl, 8, 28);
+    lv_obj_set_width(s_voice_text_lbl, 192);
+    lv_label_set_long_mode(s_voice_text_lbl, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(s_voice_text_lbl, "(暂无内容，按 OK 开始说话)");
+    lv_obj_set_style_text_font(s_voice_text_lbl, ui_font_pick_14("暂无内容"), 0);
+    lv_obj_set_style_text_color(s_voice_text_lbl, lv_color_hex(UI_THEME_TEXT), 0);
+
+    // 底部操作说明
+    ui_theme_divider(p, 12, 268, 216);
+    s_voice_hint_lbl = ui_theme_label(p, "[OK]录音/结束  [上下]切页", 12, 276, 216,
+                                      UI_THEME_MUTED, ui_font_pick_14("[OK]录音/结束  [上下]切页"));
+    ui_theme_center(s_voice_hint_lbl);
+
+    lv_obj_t *menu_hint = ui_theme_label(p, "[长按OK]返回主菜单", 12, 296, 216,
+                                        UI_THEME_MUTED, ui_font_pick_14("[长按OK]返回主菜单"));
+    ui_theme_center(menu_hint);
+}
+
+static void voice_panel_tick(void)
+{
+    if (!s_voice_state_lbl) return;
+
+    voice_state_t vs = app_voice_get_state();
+
+    switch (vs) {
+    case VOICE_RECORDING: {
+        lv_label_set_text(s_voice_state_lbl, "● 正在录音 (再按 OK 结束)");
+        lv_obj_set_style_text_color(s_voice_state_lbl, lv_color_hex(UI_THEME_RED), 0);
+        lv_obj_set_style_border_color(s_voice_level_box, lv_color_hex(UI_THEME_RED), 0);
+
+        int lvl = app_voice_get_level() / 10;   // 0..10
+        if (lvl < 0) lvl = 0;
+        if (lvl > 10) lvl = 10;
+        char bar[64] = {0};
+        int pos = 0;
+        for (int i = 0; i < 10; i++)
+            pos += snprintf(bar + pos, sizeof(bar) - pos, i < lvl ? "■" : "░");
+        lv_label_set_text(s_voice_level_bar, bar);
+
+        uint32_t ms = app_voice_get_duration_ms();
+        lv_label_set_text_fmt(s_voice_dur_lbl, "时长: %u.%us / 30s", (unsigned)(ms / 1000),
+                              (unsigned)((ms % 1000) / 100));
+
+        lv_label_set_text(s_voice_hint_lbl, "短按 [OK] 结束录音并识别");
+        break;
+    }
+    case VOICE_UPLOADING:
+        lv_label_set_text(s_voice_state_lbl, "▲ 语音上传 & 识别中…");
+        lv_obj_set_style_text_color(s_voice_state_lbl, lv_color_hex(UI_THEME_CYAN), 0);
+        lv_obj_set_style_border_color(s_voice_level_box, lv_color_hex(UI_THEME_CYAN), 0);
+        lv_label_set_text(s_voice_level_bar, "■■■■■■■■■■");
+        lv_label_set_text(s_voice_hint_lbl, "正在识别，请稍候…");
+        break;
+    case VOICE_REVIEW: {
+        const char *res = app_voice_get_result_text();
+        lv_label_set_text(s_voice_state_lbl, "★ 识别完成 (等待用户确认)");
+        lv_obj_set_style_text_color(s_voice_state_lbl, lv_color_hex(UI_THEME_AMBER), 0);
+        lv_obj_set_style_border_color(s_voice_level_box, lv_color_hex(UI_THEME_AMBER), 0);
+        lv_label_set_text(s_voice_level_bar, "==========");
+
+        lv_label_set_text(s_voice_text_lbl, res[0] ? res : "(空内容)");
+        lv_label_set_text(s_voice_hint_lbl, "OK发送 上续说 下撤销 双击重录");
+        break;
+    }
+    case VOICE_DONE: {
+        const char *res = app_voice_get_result_text();
+        lv_label_set_text(s_voice_state_lbl, "√ Prompt 发送成功");
+        lv_obj_set_style_text_color(s_voice_state_lbl, lv_color_hex(UI_THEME_GREEN), 0);
+        lv_obj_set_style_border_color(s_voice_level_box, lv_color_hex(UI_THEME_GREEN), 0);
+        lv_label_set_text(s_voice_level_bar, "░░░░░░░░░░");
+        if (res[0]) lv_label_set_text(s_voice_text_lbl, res);
+        lv_label_set_text(s_voice_hint_lbl, "已注入会话，按 [OK] 新录音");
+        break;
+    }
+    case VOICE_FAILED: {
+        const char *res = app_voice_get_result_text();
+        lv_label_set_text(s_voice_state_lbl, "× 识别或发送失败");
+        lv_obj_set_style_text_color(s_voice_state_lbl, lv_color_hex(UI_THEME_RED), 0);
+        lv_obj_set_style_border_color(s_voice_level_box, lv_color_hex(UI_THEME_RED), 0);
+        lv_label_set_text(s_voice_level_bar, "░░░░░░░░░░");
+        if (res[0]) lv_label_set_text(s_voice_text_lbl, res);
+        lv_label_set_text(s_voice_hint_lbl, "按 [OK] 重新录音");
+        break;
+    }
+    case VOICE_IDLE:
+    default:
+        lv_label_set_text(s_voice_state_lbl, "[ 短按 OK 开始录音 ]");
+        lv_obj_set_style_text_color(s_voice_state_lbl, lv_color_hex(UI_THEME_MUTED), 0);
+        lv_obj_set_style_border_color(s_voice_level_box, lv_color_hex(UI_THEME_GRID), 0);
+        lv_label_set_text(s_voice_level_bar, "░░░░░░░░░░");
+        lv_label_set_text(s_voice_dur_lbl, "时长: 0.0s / 30s");
+        lv_label_set_text(s_voice_hint_lbl, "[OK]录音/结束  [上下]切页");
+        break;
+    }
+}
+
 // ---------------------------------------------------------------- 轮播
 static void strip_x_cb(void *var, int32_t v)
 {
@@ -361,8 +502,8 @@ static void strip_x_cb(void *var, int32_t v)
 static void go_to(int page)
 {
     if (!s_strip) return;
-    if (page < 0) page = 1;
-    if (page > 1) page = 0;
+    if (page < 0) page = PAGE_COUNT - 1;
+    if (page >= PAGE_COUNT) page = 0;
     s_page = page;
 
     lv_anim_delete(s_strip, strip_x_cb);
@@ -394,118 +535,10 @@ static void tick(lv_timer_t *timer)
     (void)timer;
     update_clock(s_clock);
     update_clock(s_pet_clock);
+    update_clock(s_voice_clock);
     notify_panel_tick();
     pet_panel_tick();
-    ptt_tick();
-}
-
-static void ptt_modal_create(void)
-{
-    s_ptt_box = ui_theme_box(s_scr, 15, 100, 210, 110, UI_THEME_PANEL, 0);
-    lv_obj_set_style_bg_color(s_ptt_box, lv_color_hex(UI_THEME_PANEL), 0);
-    lv_obj_set_style_bg_opa(s_ptt_box, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(s_ptt_box, 2, 0);
-    lv_obj_set_style_border_color(s_ptt_box, lv_color_hex(UI_THEME_CYAN), 0);
-
-    s_ptt_title = lv_label_create(s_ptt_box);
-    lv_obj_set_pos(s_ptt_title, 10, 10);
-    lv_obj_set_width(s_ptt_title, 190);
-    lv_label_set_long_mode(s_ptt_title, LV_LABEL_LONG_DOT);
-    lv_label_set_text(s_ptt_title, "● 录音中 (再按 OK 结束)");
-    lv_obj_set_style_text_font(s_ptt_title, ui_font_pick_14("录音"), 0);
-
-    s_ptt_bar = lv_label_create(s_ptt_box);
-    lv_obj_set_pos(s_ptt_bar, 10, 42);
-    lv_obj_set_width(s_ptt_bar, 190);
-    lv_label_set_long_mode(s_ptt_bar, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(s_ptt_bar, "░░░░░░░░░░");
-    lv_obj_set_style_text_font(s_ptt_bar, ui_font_pick_14("░"), 0);
-    lv_obj_set_style_text_color(s_ptt_bar, lv_color_hex(UI_THEME_AMBER), 0);
-
-    s_ptt_hint = lv_label_create(s_ptt_box);
-    lv_obj_set_pos(s_ptt_hint, 10, 76);
-    lv_obj_set_width(s_ptt_hint, 190);
-    lv_label_set_long_mode(s_ptt_hint, LV_LABEL_LONG_DOT);
-    lv_label_set_text(s_ptt_hint, "时长: 0.0s");
-    lv_obj_set_style_text_font(s_ptt_hint, ui_font_pick_14("时长"), 0);
-    lv_obj_set_style_text_color(s_ptt_hint, lv_color_hex(UI_THEME_MUTED), 0);
-
-    set_hidden(s_ptt_box, true);
-}
-
-// PTT 覆盖层:按 app_voice 状态刷新。录音/上传时显示;完成/失败展示 3 秒后自动隐藏。
-static void ptt_tick(void)
-{
-    if (!s_ptt_box) return;
-
-    static voice_state_t s_last = VOICE_IDLE;
-    static int64_t s_hide_at_us = 0;
-    voice_state_t vs = app_voice_get_state();
-    int64_t now = esp_timer_get_time();
-
-    if (vs != s_last) {
-        s_last = vs;
-        s_hide_at_us = (vs == VOICE_DONE || vs == VOICE_FAILED)
-                           ? now + 3LL * 1000 * 1000 : 0;
-    }
-
-    bool show = (vs == VOICE_RECORDING || vs == VOICE_UPLOADING || vs == VOICE_REVIEW) ||
-                ((vs == VOICE_DONE || vs == VOICE_FAILED) && now < s_hide_at_us);
-    set_hidden(s_ptt_box, !show);
-    if (!show) return;
-
-    switch (vs) {
-    case VOICE_REVIEW: {
-        const char *res = app_voice_get_result_text();
-        lv_label_set_text(s_ptt_title, "识别结果 (待确认)");
-        lv_obj_set_style_text_color(s_ptt_title, lv_color_hex(UI_THEME_CYAN), 0);
-        lv_label_set_text(s_ptt_bar, res[0] ? res : "(空)");
-        lv_label_set_text(s_ptt_hint, "OK发送 上续说 下撤销 双击重录");
-        break;
-    }
-    case VOICE_RECORDING: {
-        lv_label_set_text(s_ptt_title, "● 录音中 (再按 OK 结束)");
-        lv_obj_set_style_text_color(s_ptt_title, lv_color_hex(UI_THEME_RED), 0);
-
-        int lvl = app_voice_get_level() / 10;   // 0..10
-        if (lvl < 0) lvl = 0;
-        if (lvl > 10) lvl = 10;
-        char bar[64] = {0};
-        int pos = 0;
-        for (int i = 0; i < 10; i++)
-            pos += snprintf(bar + pos, sizeof(bar) - pos, i < lvl ? "■" : "░");
-        lv_label_set_text(s_ptt_bar, bar);
-
-        uint32_t ms = app_voice_get_duration_ms();
-        lv_label_set_text_fmt(s_ptt_hint, "时长: %u.%us", (unsigned)(ms / 1000),
-                              (unsigned)((ms % 1000) / 100));
-        break;
-    }
-    case VOICE_UPLOADING:
-        lv_label_set_text(s_ptt_title, "▲ 识别 & 注入中…");
-        lv_obj_set_style_text_color(s_ptt_title, lv_color_hex(UI_THEME_CYAN), 0);
-        lv_label_set_text(s_ptt_bar, "■■■■■■■■■■");
-        lv_label_set_text(s_ptt_hint, "请稍候…");
-        break;
-    case VOICE_DONE: {
-        const char *res = app_voice_get_result_text();
-        lv_label_set_text(s_ptt_title, "√ Prompt 发送成功");
-        lv_obj_set_style_text_color(s_ptt_title, lv_color_hex(UI_THEME_GREEN), 0);
-        lv_label_set_text_fmt(s_ptt_bar, "\"%s\"", res[0] ? res : "OK");
-        lv_label_set_text(s_ptt_hint, "已注入当前会话");
-        break;
-    }
-    case VOICE_FAILED: {
-        const char *res = app_voice_get_result_text();
-        lv_label_set_text(s_ptt_title, "× 发送失败");
-        lv_obj_set_style_text_color(s_ptt_title, lv_color_hex(UI_THEME_RED), 0);
-        lv_label_set_text(s_ptt_bar, res[0] ? res : "未知错误");
-        lv_label_set_text(s_ptt_hint, "再按 OK 重试");
-        break;
-    }
-    default:
-        break;
-    }
+    voice_panel_tick();
 }
 
 static void carousel_enter(int start)
@@ -526,19 +559,18 @@ static void carousel_enter(int start)
     lv_obj_remove_style_all(s_strip);
     lv_obj_remove_flag(s_strip, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_pos(s_strip, 0, 0);
-    lv_obj_set_size(s_strip, PANEL_W * 2, PANEL_H);
+    lv_obj_set_size(s_strip, PANEL_W * PAGE_COUNT, PANEL_H);
 
     notify_panel_create(panel_create(0));
     pet_panel_create(panel_create(PANEL_W));
+    voice_panel_create(panel_create(PANEL_W * 2));
     lv_obj_set_x(s_strip, -start * PANEL_W);
-
-    ptt_modal_create();
 
     s_timer = lv_timer_create(tick, 100, NULL);
     lv_screen_load(s_scr);
 
     app_notify_set_enabled(true);
-    ESP_LOGI(TAG, "8-bit 状态页进入 (start=%d)", start);
+    ESP_LOGI(TAG, "8-bit 状态页进入 (start=%d, total_pages=%d)", start, PAGE_COUNT);
 }
 
 static void carousel_exit(void)
@@ -560,7 +592,9 @@ static void carousel_exit(void)
         s_strip = NULL;
         s_status = s_title = s_text = s_agg = s_clock = NULL;
         s_pet_anim = s_pet_state = s_pet_clock = NULL;
-        s_ptt_box = s_ptt_title = s_ptt_bar = s_ptt_hint = NULL;
+        s_voice_clock = s_voice_tag = s_voice_state_lbl = NULL;
+        s_voice_level_box = s_voice_level_bar = s_voice_dur_lbl = NULL;
+        s_voice_text_box = s_voice_text_lbl = s_voice_hint_lbl = NULL;
         for (int i = 0; i < LIST_ROWS; i++) s_row[i] = s_tag[i] = s_name[i] = NULL;
     }
 }
@@ -570,22 +604,25 @@ static void carousel_key(bsp_btn_t btn, bsp_btn_ev_t ev)
     voice_state_t vs = app_voice_get_state();
 
     if (btn == BSP_BTN_OK) {
-        if (ev == BSP_BTN_CLICK) {
-            if (vs == VOICE_RECORDING) {
-                app_voice_stop_record();                 // 结束录音 → 识别
-            } else if (vs == VOICE_REVIEW) {
-                app_voice_commit();                      // 确认发送
-            } else if (vs == VOICE_IDLE || vs == VOICE_DONE || vs == VOICE_FAILED) {
-                app_voice_start_record();                // 开始新录音
+        // 只有在语音对讲页 (s_page == 2) 才响应语音录音/发送/重录操作
+        if (s_page == 2) {
+            if (ev == BSP_BTN_CLICK) {
+                if (vs == VOICE_RECORDING) {
+                    app_voice_stop_record();                 // 结束录音 → 识别
+                } else if (vs == VOICE_REVIEW) {
+                    app_voice_commit();                      // 确认发送
+                } else if (vs == VOICE_IDLE || vs == VOICE_DONE || vs == VOICE_FAILED) {
+                    app_voice_start_record();                // 开始新录音
+                }
+            } else if (ev == BSP_BTN_DOUBLE && vs == VOICE_REVIEW) {
+                app_voice_start_record();                    // 重录(丢弃当前)
             }
-        } else if (ev == BSP_BTN_DOUBLE && vs == VOICE_REVIEW) {
-            app_voice_start_record();                    // 重录(丢弃当前)
         }
         return;
     }
 
     if (ev != BSP_BTN_CLICK) return;
-    if (vs == VOICE_REVIEW) {         // 待确认时上下键改作语音操作
+    if (s_page == 2 && vs == VOICE_REVIEW) { // 语音页待确认时上下键改作语音操作
         if (btn == BSP_BTN_UP)        app_voice_start_append();   // 继续说
         else if (btn == BSP_BTN_DOWN) app_voice_cancel();         // 撤销
         return;
@@ -595,5 +632,7 @@ static void carousel_key(bsp_btn_t btn, bsp_btn_ev_t ev)
 }
 
 void demo_notify_enter(void) { carousel_enter(0); }
+void demo_pet_enter(void)    { carousel_enter(1); }
+void demo_voice_enter(void)  { carousel_enter(2); }
 void demo_notify_exit(void)  { carousel_exit(); }
 void demo_notify_key(bsp_btn_t btn, bsp_btn_ev_t ev) { carousel_key(btn, ev); }

@@ -35,6 +35,8 @@ void demo_brightness_key(bsp_btn_t btn, bsp_btn_ev_t ev);
 
 void demo_notify_enter(void);  void demo_notify_exit(void);
 void demo_notify_key(bsp_btn_t btn, bsp_btn_ev_t ev);
+void demo_pet_enter(void);
+void demo_voice_enter(void);
 
 void demo_sound_enter(void);   void demo_sound_exit(void);
 void demo_sound_key(bsp_btn_t btn, bsp_btn_ev_t ev);

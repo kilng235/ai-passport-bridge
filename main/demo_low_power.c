@@ -1,177 +1,155 @@
-// main/demo_low_power.c —— light/deep sleep + RTC timer 唤醒验证。
-// 不使用按键唤醒：仓库尚无板级唤醒电路证据。
+// main/demo_low_power.c —— 待机与熄屏设置:选择无操作后的熄屏超时并持久化到 NVS。
 #include "demo.h"
-#include "bsp_display.h"
+#include "app_cfg.h"
 #include "power_idle.h"
+#include "power_idle_logic.h"
 #include "ui_pixel.h"
+#include "ui_theme.h"
+#include "ui_font.h"
 
-#include "esp_attr.h"
 #include "esp_log.h"
-#include "esp_err.h"
-#include "esp_sleep.h"
-#include "esp_timer.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "lvgl.h"
 #include <stdio.h>
 #include <stdint.h>
 
 static const char *TAG = "demo_power";
 
-#define LIGHT_SLEEP_TIME_US (2ULL * 1000ULL * 1000ULL)
-#define DEEP_SLEEP_TIME_US  (5ULL * 1000ULL * 1000ULL)
-#define DEEP_SLEEP_MAGIC    0x464F4C4FUL
+#define OPTION_COUNT 4
 
-typedef enum {
-    SLEEP_COMMAND_LIGHT = 1,
-    SLEEP_COMMAND_DEEP,
-} sleep_command_t;
+typedef struct {
+    uint16_t sec;
+    const char *title;
+    const char *tag;
+    const char *detail;
+} idle_opt_t;
+
+static const idle_opt_t OPTIONS[OPTION_COUNT] = {
+    { POWER_IDLE_TIMEOUT_30S,   "30 秒",   "极速省电", "15s 降至微光，30s 完全熄屏" },
+    { POWER_IDLE_TIMEOUT_60S,   "1 分钟",  "标准平衡", "30s 降至微光，60s 完全熄屏" },
+    { POWER_IDLE_TIMEOUT_180S,  "3 分钟",  "长时显示", "90s 降至微光，3m 完全熄屏" },
+    { POWER_IDLE_TIMEOUT_NEVER, "从不熄屏", "桌面常亮", "屏幕始终保持设定亮度" },
+};
 
 static lv_obj_t *s_scr;
 static lv_obj_t *s_status;
-static lv_obj_t *s_mode_cards[2];
-static lv_obj_t *s_mascot;
-static TaskHandle_t s_task;
-static volatile bool s_busy;
-static int s_selected;
-static RTC_DATA_ATTR uint32_t s_deep_sleep_magic;
-static RTC_DATA_ATTR uint32_t s_deep_sleep_count;
+static lv_obj_t *s_detail;
+static lv_obj_t *s_cards[OPTION_COUNT];
+static lv_obj_t *s_labels[OPTION_COUNT];
+static lv_obj_t *s_tags[OPTION_COUNT];
+static int s_selected = 1;      // 默认 1 分钟
+static uint16_t s_saved_sec = POWER_IDLE_TIMEOUT_60S;
 
-static void menu_refresh(void)
+static void update_cards(void)
 {
-    for (int i = 0; i < 2; i++) {
-        ui_pixel_set_selected(s_mode_cards[i], i == s_selected, true);
-    }
-}
+    for (int i = 0; i < OPTION_COUNT; i++) {
+        bool is_sel = (i == s_selected);
+        bool is_cur = (OPTIONS[i].sec == s_saved_sec);
 
-static void set_status(const char *text)
-{
-    if (!bsp_lvgl_lock(500)) return;
-    if (s_status) lv_label_set_text(s_status, text);
-    bsp_lvgl_unlock();
-}
+        ui_pixel_set_selected(s_cards[i], is_sel, true);
 
-static void sleep_task(void *arg)
-{
-    (void)arg;
-    for (;;) {
-        uint32_t command = 0;
-        xTaskNotifyWait(0, UINT32_MAX, &command, portMAX_DELAY);
-        if (!s_scr) continue;
-
-        s_busy = true;
-        if (command == SLEEP_COMMAND_DEEP) {
-            set_status("DEEP SLEEP: 5 SEC\nApplication will restart");
-            vTaskDelay(pdMS_TO_TICKS(250));
-            esp_err_t err = esp_sleep_enable_timer_wakeup(DEEP_SLEEP_TIME_US);
-            if (err == ESP_OK) {
-                if (s_deep_sleep_magic != DEEP_SLEEP_MAGIC) s_deep_sleep_count = 0;
-                s_deep_sleep_magic = DEEP_SLEEP_MAGIC;
-                s_deep_sleep_count++;
-                bsp_display_backlight(0);
-                esp_deep_sleep_start();
-            }
-            char text[96];
-            snprintf(text, sizeof(text), "Deep sleep failed:\n%s", esp_err_to_name(err));
-            set_status(text);
-            ESP_LOGE(TAG, "deep sleep 失败: %s", esp_err_to_name(err));
-        } else {
-            set_status("LIGHT SLEEP: 2 SEC\nTimer wakeup");
-            vTaskDelay(pdMS_TO_TICKS(150));
-            bsp_display_backlight(0);
-
-            esp_err_t err = esp_sleep_enable_timer_wakeup(LIGHT_SLEEP_TIME_US);
-            int64_t before = esp_timer_get_time();
-            if (err == ESP_OK) err = esp_light_sleep_start();
-            int64_t slept_ms = (esp_timer_get_time() - before) / 1000;
-            esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
-            bsp_display_backlight(100);
-
-            char text[128];
-            if (err == ESP_OK) {
-                snprintf(text, sizeof(text), "LIGHT WAKE: TIMER\nSlept: %lld ms",
-                         (long long)slept_ms);
-            } else {
-                snprintf(text, sizeof(text), "Light sleep failed:\n%s", esp_err_to_name(err));
-                ESP_LOGE(TAG, "light sleep 失败: %s", esp_err_to_name(err));
-            }
-            set_status(text);
+        if (s_labels[i]) {
+            lv_obj_set_style_text_color(s_labels[i],
+                lv_color_hex(is_sel ? UI_THEME_BG : (is_cur ? UI_THEME_AMBER : UI_THEME_TEXT)), 0);
         }
-        s_busy = false;
+        if (s_tags[i]) {
+            lv_obj_set_style_text_color(s_tags[i],
+                lv_color_hex(is_sel ? UI_THEME_BG : UI_THEME_MUTED), 0);
+        }
+    }
+
+    if (s_detail) {
+        lv_label_set_text(s_detail, OPTIONS[s_selected].detail);
     }
 }
 
 void demo_low_power_enter(void)
 {
-    power_idle_set_enabled(false);   // 本页自行控制休眠/背光,关闭全局空闲熄屏
-    s_scr = ui_pixel_screen_create("LOW POWER");
-    lv_obj_t *panel = ui_pixel_panel_create(s_scr, 14, 54, 212, 190, UI_PAPER);
-    s_status = lv_label_create(panel);
-    lv_obj_set_width(s_status, 184);
-    lv_obj_set_style_text_align(s_status, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(s_status, lv_color_hex(UI_INK), 0);
-    lv_obj_align(s_status, LV_ALIGN_TOP_MID, 0, 1);
-    if (s_deep_sleep_magic == DEEP_SLEEP_MAGIC &&
-        esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER) {
-        lv_label_set_text_fmt(s_status,
-                              "DEEP TIMER WAKE  #%lu\nUP/DOWN: SELECT  OK: RUN",
-                              (unsigned long)s_deep_sleep_count);
-    } else {
-        lv_label_set_text(s_status, "UP/DOWN: SELECT  OK: RUN\nRTC TIMER WAKE ONLY");
+    s_saved_sec = power_idle_get_timeout_sec();
+    s_selected = 1; // 默认 60s
+    for (int i = 0; i < OPTION_COUNT; i++) {
+        if (OPTIONS[i].sec == s_saved_sec) {
+            s_selected = i;
+            break;
+        }
     }
 
-    static const char *MODE_NAMES[] = {
-        "LIGHT SLEEP  |  2 SEC",
-        "DEEP SLEEP   |  5 SEC",
-    };
-    for (int i = 0; i < 2; i++) {
-        s_mode_cards[i] = ui_pixel_panel_create(panel, 7, 56 + i * 54,
-                                                 176, 42, UI_PAPER);
-        lv_obj_t *label = lv_label_create(s_mode_cards[i]);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
-        lv_obj_set_style_text_color(label, lv_color_hex(UI_INK), 0);
-        lv_label_set_text(label, MODE_NAMES[i]);
-        lv_obj_center(label);
+    s_scr = ui_pixel_screen_create("待机与熄屏");
+    lv_obj_t *panel = ui_pixel_panel_create(s_scr, 14, 50, 212, 256, UI_PAPER);
+
+    s_status = lv_label_create(panel);
+    lv_obj_set_width(s_status, 196);
+    lv_obj_set_style_text_align(s_status, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(s_status, lv_color_hex(UI_INK), 0);
+    lv_obj_set_style_text_font(s_status, ui_font_pick_14("上下选择"), 0);
+    lv_obj_align(s_status, LV_ALIGN_TOP_MID, 0, 6);
+    lv_label_set_text(s_status, "[上下]选择  [OK]保存生效");
+
+    const int card_h = 40;
+    const int gap = 8;
+    const int y0 = 30;
+
+    for (int i = 0; i < OPTION_COUNT; i++) {
+        s_cards[i] = ui_pixel_panel_create(panel, 8, y0 + i * (card_h + gap), 180, card_h, UI_PAPER);
+
+        s_labels[i] = lv_label_create(s_cards[i]);
+        lv_obj_set_style_text_font(s_labels[i], ui_font_pick_14(OPTIONS[i].title), 0);
+        lv_obj_set_pos(s_labels[i], 10, 12);
+        lv_label_set_text(s_labels[i], OPTIONS[i].title);
+
+        s_tags[i] = lv_label_create(s_cards[i]);
+        lv_obj_set_style_text_font(s_tags[i], ui_font_pick_14(OPTIONS[i].tag), 0);
+        lv_obj_set_pos(s_tags[i], 112, 12);
+        lv_label_set_text(s_tags[i], OPTIONS[i].tag);
     }
-    s_selected = 0;
-    menu_refresh();
-    s_mascot = ui_pixel_mascot_create(s_scr, 101, 246);
-    s_busy = false;
-    if (!s_task && xTaskCreate(sleep_task, "demo_sleep", 3072, NULL, 4, &s_task) != pdPASS) {
-        lv_label_set_text(s_status, "Cannot create\nsleep worker");
-        ESP_LOGE(TAG, "创建 light-sleep 任务失败");
-    }
+
+    // 底部专属说明文本(位于 panel 内部正下方)
+    s_detail = lv_label_create(panel);
+    lv_obj_set_pos(s_detail, 6, 226);
+    lv_obj_set_width(s_detail, 184);
+    lv_obj_set_style_text_align(s_detail, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_font(s_detail, ui_font_pick_14("30s 完全熄屏"), 0);
+    lv_obj_set_style_text_color(s_detail, lv_color_hex(UI_THEME_CYAN), 0);
+
+    update_cards();
     lv_screen_load(s_scr);
 }
 
 void demo_low_power_exit(void)
 {
-    if (s_task) {
-        vTaskDelete(s_task);
-        s_task = NULL;
-    }
-    s_busy = false;
-    bsp_display_backlight(100);
-    power_idle_set_enabled(true);
-    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
     if (s_scr) {
         lv_obj_delete(s_scr);
         s_scr = NULL;
-        s_status = NULL;
-        s_mode_cards[0] = s_mode_cards[1] = NULL;
-        s_mascot = NULL;
+        s_status = s_detail = NULL;
+        for (int i = 0; i < OPTION_COUNT; i++) {
+            s_cards[i] = s_labels[i] = s_tags[i] = NULL;
+        }
     }
 }
 
 void demo_low_power_key(bsp_btn_t btn, bsp_btn_ev_t ev)
 {
-    if (ev != BSP_BTN_CLICK || s_busy || !s_task) return;
-    if (btn == BSP_BTN_UP || btn == BSP_BTN_DOWN) {
-        s_selected = (s_selected + 1) % 2;
-        menu_refresh();
-        ui_pixel_mascot_jump(s_mascot);
+    if (ev != BSP_BTN_CLICK) return;
+
+    if (btn == BSP_BTN_DOWN) {
+        s_selected = (s_selected + 1) % OPTION_COUNT;
+        update_cards();
+    } else if (btn == BSP_BTN_UP) {
+        s_selected = (s_selected + OPTION_COUNT - 1) % OPTION_COUNT;
+        update_cards();
     } else if (btn == BSP_BTN_OK) {
-        uint32_t command = s_selected == 0 ? SLEEP_COMMAND_LIGHT : SLEEP_COMMAND_DEEP;
-        xTaskNotify(s_task, command, eSetValueWithOverwrite);
+        uint16_t new_sec = OPTIONS[s_selected].sec;
+        s_saved_sec = new_sec;
+        app_cfg_save_idle_timeout(new_sec);
+        power_idle_set_timeout_sec(new_sec);
+
+        update_cards();
+
+        if (s_status) {
+            char tip[64];
+            snprintf(tip, sizeof(tip), "√ 保存成功: %s", OPTIONS[s_selected].title);
+            lv_label_set_text(s_status, tip);
+            lv_obj_set_style_text_color(s_status, lv_color_hex(UI_THEME_GREEN), 0);
+        }
+        ESP_LOGI(TAG, "已保存并应用待机超时: %u 秒", new_sec);
     }
 }
