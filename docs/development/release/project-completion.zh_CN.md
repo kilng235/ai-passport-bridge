@@ -216,7 +216,7 @@ flowchart TD
 - 归档中永不存储合并固件 `.bin` 或封面图；归档仅文本，两者都是构建/发布产物。
 - 未经开发者审查与同意不提交。
 
-相关：[应用归档约定](../../reference/README.zh_CN.md)、[`plays-archive` skill](../../../skills/plays-archive/SKILL.zh_CN.md)。
+相关：[应用归档约定](../../reference/README.zh_CN.md)。
 
 ## 动作 E：更新根 README
 
@@ -245,7 +245,7 @@ README 更新与其他五项一样是**可选**动作，也是归档的默认伴
 3. 在 fork `main`：更新根 README 对，让已发布应用可从仓库落地页被发现，完整包含承载分支 README 的内容。
 4. 直接把 README 更新提交到分支 / fork `main`（fork 拥有内容）；除非是上游变更，否则不开 PR。
 
-相关：[fork 工作流与根 README 归属](../../fork-guide.zh_CN.md)、[`plays-archive` skill](../../../skills/plays-archive/SKILL.zh_CN.md)、[文档规范](../../contribution/doc-conventions.zh_CN.md)。
+相关：[fork 工作流与根 README 归属](../../fork-guide.zh_CN.md)、[文档规范](../../contribution/doc-conventions.zh_CN.md)。
 
 ## 动作 F：提交 issue
 
@@ -266,7 +266,7 @@ README 更新与其他五项一样是**可选**动作，也是归档的默认伴
 - 永不包含凭证、设备 QR 秘密、私密设备链接、个人数据或未脱敏日志。
 - 安全漏洞走 `.github/SECURITY.md`，不是公开 issue。
 
-相关：[提交 issue 参考](file-issues.zh_CN.md)、[`issue-suggestions` skill](../../../skills/issue-suggestions/SKILL.zh_CN.md)、[issue 模板](../../../.github/ISSUE_TEMPLATE/feature_request.yml)。
+相关：[提交 issue 参考](file-issues.zh_CN.md)、[issue 模板](../../../.github/ISSUE_TEMPLATE/feature_request.yml)。
 
 ## 相关文档
 

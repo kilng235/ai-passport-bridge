@@ -32,7 +32,7 @@
 - 仓库根目录仅保留工具发现入口（`AGENTS.md`、`CLAUDE.md` 及其翻译）、可选的 fork README 配对、许可证、构建清单和 ESP-IDF 配置。
 - 项目说明与变更历史放入 `docs/`，按协作、开发、硬件和软件职责分类。
 - GitHub 自动识别的社区文档、模板、Issue Form 和 workflow 放入 `.github/`。
-- 可复用资源放入 `assets/`，项目 skill 放入 `skills/`，自动化脚本放入 `tools/`。
+- 把可复用静态资源放入 `assets/`，自动化脚本放入 `tools/`。
 - 仓库检查会拒绝新增其它根目录 Markdown。不要为了显眼而把文档放根目录，应从 `docs/README.md` 建立入口。
 
 不要创建只有目录说明而没有实际用途的空骨架。新增文档必须在 `docs/README.md` 或所属目录索引中登记；删除或移动文档时同步更新所有链接。

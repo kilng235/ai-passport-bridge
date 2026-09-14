@@ -31,7 +31,7 @@ This file is the only mandatory entry point for AI-assisted work in this reposit
 | Demo or menu | `main/demo.h`, `main/main.c`, the nearest `main/demo_*.c` implementation |
 | Build, test, dependencies, partitions | `docs/development/engineering/build-and-test.md`, `docs/development/engineering/protected-flash-layout.md`, `sdkconfig.defaults`, `partitions.csv` |
 | CI or release | the matching file in `docs/development/ci/CI-*.md` and `.github/workflows/` |
-| Project completion | `docs/development/release/project-completion.md` (then the `issue-suggestions` or `experience-pr` skill) |
+| Project completion | `docs/development/release/project-completion.md` |
 | Documentation | `docs/contribution/doc-conventions.md`, `docs/README.md` |
 | Commit or PR | `docs/contribution/commit-and-pr.md` |
 

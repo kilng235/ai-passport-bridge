@@ -68,5 +68,5 @@ data, or unsanitized logs. Security vulnerabilities must go through
 ## Related documents
 
 - Project completion overview: [project-completion.md](project-completion.md)
-- Issue skill: [`../../skills/issue-suggestions/SKILL.md`](../../../skills/issue-suggestions/SKILL.md)
+- Related: [File an issue](file-issues.md).
 - Firmware publishing: [publish-to-community.md](publish-to-community.md)

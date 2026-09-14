@@ -56,5 +56,5 @@ issue 用于提交围绕固件、BSP、硬件或文档的用户建议、功能�
 ## 相关文档
 
 - 项目开发完成流程总览：[project-completion.zh_CN.md](project-completion.zh_CN.md)
-- issue skill：[`../../skills/issue-suggestions/SKILL.md`](../../../skills/issue-suggestions/SKILL.zh_CN.md)
+- 相关：[提交 issue 参考](file-issues.zh_CN.md)。
 - 固件发布：[publish-to-community.zh_CN.md](publish-to-community.zh_CN.md)

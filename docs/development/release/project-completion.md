@@ -303,7 +303,7 @@ driven by the `plays-archive` skill.
 - Do not submit before developer review and consent.
 
 Related: [application archive convention](../../reference/README.md),
-[`plays-archive` skill](../../../skills/plays-archive/SKILL.md).
+Related: [archive guidelines](../../reference/README.md).
 
 ## Action E: Update the Root README
 
@@ -357,7 +357,7 @@ application is registered where it is developed.
    content); do not open a PR for this unless it is an upstream change.
 
 Related: [fork workflow and root README ownership](../../fork-guide.md),
-[`plays-archive` skill](../../../skills/plays-archive/SKILL.md),
+Related: [fork workflow and root README assignment](../../fork-guide.md), [documentation conventions](../../contribution/doc-conventions.md).
 [documentation conventions](../../contribution/doc-conventions.md).
 
 ## Action F: File an Issue
@@ -386,7 +386,7 @@ project, not the fork.
 - Security vulnerabilities go through `.github/SECURITY.md`, not a public issue.
 
 Related: [filing issues reference](file-issues.md),
-[`issue-suggestions` skill](../../../skills/issue-suggestions/SKILL.md),
+Related: [filing issues reference](file-issues.md), [issue template](../../../.github/ISSUE_TEMPLATE/feature_request.yml).
 [issue template](../../../.github/ISSUE_TEMPLATE/feature_request.yml).
 
 ## Related documents

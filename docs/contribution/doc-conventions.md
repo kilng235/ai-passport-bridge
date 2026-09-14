@@ -33,7 +33,7 @@ These rules apply equally to human contributors and AI agents. Documentation is 
 - Keep the tracked repository root limited to tool-discovery files (`AGENTS.md`, `CLAUDE.md` and their translations), an optional fork README pair, license/build manifests, and ESP-IDF configuration.
 - Put project documentation and history in `docs/`, grouped by contribution, development, hardware, and software responsibility.
 - Put GitHub-recognized community files, templates, issue forms, and workflows in `.github/`.
-- Put reusable binary/source assets in `assets/`, project skills in `skills/`, and automation in `tools/`.
+- Put reusable binary/source assets in `assets/` and automation in `tools/`.
 - Repository checks reject additional root Markdown. Do not add a root document merely for visibility; link it from `docs/README.md` instead.
 
 Do not create empty document scaffolding without a concrete purpose. Register added documents in `docs/README.md` or their directory index and update links when moving or deleting files.
