@@ -10,11 +10,12 @@
 
 ## 🌟 核心功能特性
 
-1. **OpenCode 联动桥接（适配 OpenCode V2）**
-   - 通过 `tools/opencode/passport-notify.js` 插件与局域网内的 OpenCode V2 实例通信。
-   - **状态同步**：实时接收并展示任务状态（空闲 / 进行中 / 完成 / 需要确认），多会话聚合显示。
-   - **桌面宠物（Desk Pet）**：与通知状态联动的 96×96 LVGL 像素动画轮播。
-   - **无线对讲机（Voice Prompt）**：硬件按键录音上传 -> PC 端 ASR 语音转文字 -> 设备端确认/撤销/追加后注入 OpenCode 会话。
+1. **OpenCode & ZCode 双 Agent 联动桥接**
+   - **OpenCode 插件（适配 OpenCode V2）**：`tools/opencode/passport-notify.js`，通过 `Plugin.define` 规范与局域网内 OpenCode V2 实例通信。
+   - **ZCode 钩子桥接**：`tools/zcode/passport-zcode.mjs`，通过 ZCode CLI Hooks 捕获会话生命周期事件。
+   - **多源状态聚合同屏显示**：OpenCode 与 ZCode 会话共享状态聚合（`~/.passport-bridge-state.json`），同屏展示两端任务状态（空闲 / 进行中 / 完成 / 需要确认），聚合优先级调度。
+   - **桌面宠物（Desk Pet）**：与通知状态实时联动的 96×96 LVGL 像素动画轮播（Idle/Running/Done/Alert）。
+   - **无线对讲机（Voice Prompt）**：硬件按键录音上传 -> PC 端 ASR 语音转文字 -> 设备端确认/撤销/追加后注入 Agent 会话。
    - **安全机制**：局域网白名单过滤 + 可选 `PASSPORT_VOICE_TOKEN` 双向鉴权。
 2. **网络与配网**
    - 内置 SoftAP Web 配网门户（`192.168.4.1`），支持 Wi-Fi 与大模型 API Key 动态设置。

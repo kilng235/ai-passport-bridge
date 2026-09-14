@@ -10,11 +10,12 @@ This repository contains the firmware and complete architecture for the **FoloTo
 
 ## 🌟 Key Features
 
-1. **OpenCode Integration (OpenCode V2)**
-   - Communicates with local OpenCode V2 instances via `tools/opencode/passport-notify.js`.
-   - **Status Sync**: Real-time display of agent tasks (idle / running / done / requires confirmation) with multi-session aggregation.
-   - **Desk Pet**: 96×96 animated pixel companion synchronized with agent notification states.
-   - **Voice Walkie-Talkie (Voice Prompt)**: Hardware button recording -> PC-side ASR transcription -> on-device confirmation before injection into active OpenCode sessions.
+1. **OpenCode & ZCode Dual-Agent Integration**
+   - **OpenCode Companion (OpenCode V2)**: `tools/opencode/passport-notify.js`, communicates with local OpenCode V2 instances via `Plugin.define`.
+   - **ZCode Bridge**: `tools/zcode/passport-zcode.mjs`, captures lifecycle events via ZCode CLI hooks.
+   - **Multi-Source Aggregation**: Shares state (`~/.passport-bridge-state.json`) between OpenCode and ZCode, rendering unified agent states (idle / running / done / requires confirmation) with priority scheduling.
+   - **Desk Pet**: 96×96 animated pixel companion synchronized with live agent states (Idle/Running/Done/Alert).
+   - **Voice Walkie-Talkie (Voice Prompt)**: Hardware button recording -> PC-side ASR transcription -> on-device confirmation before injection into active sessions.
    - **Security**: Device IP allowlist + optional shared `PASSPORT_VOICE_TOKEN` authentication.
 2. **Connectivity & Web Portal**
    - Built-in SoftAP Web Portal (`192.168.4.1`) for dynamic Wi-Fi and LLM API Key configuration.
