@@ -6,6 +6,35 @@
 
 ## Unreleased
 
+- Made the walkie-talkie reliable end-to-end. Device: the voice task now initializes
+  the ES8311 codec itself (previously it depended on a notification beep having played
+  first, so recording failed right after a reboot with a mic-init error); the beep
+  task fully yields the codec while recording; a ~400 ms warm-up discards the ADC
+  startup transient (huge DC offset + clipping) that made ASR return empty text at
+  random; and validity is now judged by streamed bytes (>= 0.3 s) instead of wall time.
+  PC: an empty transcript no longer injects a placeholder prompt into the session —
+  the commit endpoint replies 422 so the device shows a clear failure for re-record.
+
+- Revamped the **Low Power setting page** into a real, functional **Standby & Screen Timeout configuration** (`demo_low_power.c`):
+  users can choose between **30s (Rapid Save)**, **1min (Balanced, default)**, **3min (Extended)**, or **Never (Always-on Clock)**.
+  The selected timeout is persisted to NVS (`idle_sec`) and dynamically applied to the `power_idle` timer.
+  The settings menu item is renamed to Standby and Timeout.
+
+- Raised the walkie-talkie maximum single-recording duration from 10s to 30s
+  (`app_voice.c` and `demo_status.c`), providing ample speaking time for complex
+  prompts while chunked streaming keeps RAM overhead flat (~1 KB).
+
+- Reverted Wi-Fi Modem-Sleep power saving to keep Wi-Fi at full speed (`WIFI_PS_NONE`):
+  the RF sleep window broke the first chunked audio write of a recording session,
+  which surfaced on the device as a too-short-recording error. Wi-Fi standby stays
+  powered for zero-latency streaming; battery savings remain with the screen-timeout
+  configuration.
+
+- Expanded the status carousel into a three-page flow: **Notification (0) <-> Desk Pet (1) <-> Voice Walkie-Talkie (2)**.
+  The walkie-talkie now has its own full-screen 8-bit page inside the main status carousel instead of a modal overlay,
+  featuring dedicated status indicators, real-time pixel audio visualizer, transcript box, and clear key hints.
+  Recording and voice controls are strictly isolated to the voice walkie-talkie page (page 2), avoiding accidental triggers from other pages.
+
 - Voice injection target is now workspace-correct under multi-workspace setups: it
   prefers OpenCode SDK's `ctx.client.session.list()` (the current OpenCode instance's
   own session list, already sorted by most-recently-updated) over the global merged
