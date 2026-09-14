@@ -64,6 +64,37 @@
 
 ---
 
+## 📦 预编译固件下载（Flash Artifacts）
+
+> 直接下载使用，无需自行编译 ESP-IDF 工程。
+> 所有 `.bin` 均经过 SHA-256 校验发布，**仅供个人学习与参考，请勿二次分发。**
+
+| 文件 | 大小 | SHA-256 |
+| --- | --- | --- |
+| `FoloToy-AI-Passport-full.bin`（一体化镜像） | 2.66 MB | `c2a0178e...d803e3f` |
+| `FoloToy-AI-Passport.bin`（仅 App） | 2.61 MB | `fc9e26f1...d815c12` |
+| `merged-binary.bin`（合并镜像） | 1.77 MB | `6a1d7bed...7dd7a56` |
+| `partition-table.bin`（分区表） | 3.0 KB | `a98e0784...b1b5e07c` |
+| `bootloader.bin`（二级引导） | 20.5 KB | `4a21d256...9092f209` |
+
+**完整 SHA-256 与烧录说明**：[`build/firmware/README.md`](build/firmware/README.md)
+
+**下载入口**：[GitHub Releases → v1.0.0-main](https://github.com/kilng235/folotoy-ai-passport/releases/tag/v1.0.0-main)
+
+> 这些预编译产物同时保留在仓库 [`build/firmware/`](build/firmware/) 目录中，可通过 Git 直接下载：
+>
+> ```bash
+> # 直接通过 Git 下载完整仓库中的预编译固件（需要 git-lfs 或 raw 下载）
+> curl -L -o FoloToy-AI-Passport-full.bin \
+>   https://raw.githubusercontent.com/kilng235/folotoy-ai-passport/main/build/firmware/FoloToy-AI-Passport-full.bin
+> ```
+
+### ⚠️ 桌宠（Desk-pet）资源版权声明
+
+`main/pet_frames.c` 与 `tools/pet2lvgl/desk-pet-spritesheet.png` 中的 **桌宠像素素材为第三方作品，仅供个人学习与参考，**不允许**二次修改、二次分发或移植到衍生固件中**。若基于本仓库开发衍生固件，请在发布前**移除桌宠相关素材**。其余源码遵循 [MIT 许可证](LICENSE)。
+
+---
+
 ## 🛠️ 编译与开发
 
 - **芯片目标**：ESP32-C3（8 MB Flash，无 PSRAM）

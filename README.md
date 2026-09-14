@@ -64,6 +64,43 @@ This repository contains the firmware and complete architecture for the **FoloTo
 
 ---
 
+## 📦 Pre-built Firmware Downloads
+
+> Ready-to-flash binaries. No ESP-IDF toolchain required.
+> All `.bin` files are SHA-256 verified. **For personal study and reference only — please do not redistribute.**
+
+| File | Size | SHA-256 |
+| --- | --- | --- |
+| `FoloToy-AI-Passport-full.bin` (all-in-one image) | 2.66 MB | `c2a0178e...d803e3f` |
+| `FoloToy-AI-Passport.bin` (app only) | 2.61 MB | `fc9e26f1...d815c12` |
+| `merged-binary.bin` (merged image) | 1.77 MB | `6a1d7bed...7dd7a56` |
+| `partition-table.bin` (partition table) | 3.0 KB | `a98e0784...b1b5e07c` |
+| `bootloader.bin` (second-stage bootloader) | 20.5 KB | `4a21d256...9092f209` |
+
+**Full SHA-256 + flashing instructions**: [`build/firmware/README.md`](build/firmware/README.md)
+
+**Download entry**: [GitHub Releases → v1.0.0-main](https://github.com/kilng235/folotoy-ai-passport/releases/tag/v1.0.0-main)
+
+> These artifacts are also tracked under [`build/firmware/`](build/firmware/) in this repository, so they can be fetched directly:
+>
+> ```bash
+> curl -L -o FoloToy-AI-Passport-full.bin \
+>   https://raw.githubusercontent.com/kilng235/folotoy-ai-passport/main/build/firmware/FoloToy-AI-Passport-full.bin
+> ```
+
+### ⚠️ Desk-pet Asset Copyright Notice
+
+The **Desk-pet pixel sprite assets** packaged inside the firmware (see
+`main/pet_frames.c` / `tools/pet2lvgl/desk-pet-spritesheet.png`) are
+**third-party artwork provided for personal study and reference only**.
+**Modification, redistribution, repackaging, or reuse in derivative works
+(including forks and re-releases) is NOT permitted.** If you publish a
+derivative firmware based on this codebase, please **remove the desk-pet
+assets before release**. All other source code is released under the
+[MIT License](LICENSE).
+
+---
+
 ## 🛠️ Build & Development
 
 - **Target**: ESP32-C3 (8 MB Flash, No PSRAM)
