@@ -6,14 +6,14 @@
 
 ## Unreleased
 
-- Made the walkie-talkie reliable end-to-end. Device: the voice task now initializes
-  the ES8311 codec itself (previously it depended on a notification beep having played
-  first, so recording failed right after a reboot with a mic-init error); the beep
-  task fully yields the codec while recording; a ~400 ms warm-up discards the ADC
-  startup transient (huge DC offset + clipping) that made ASR return empty text at
-  random; and validity is now judged by streamed bytes (>= 0.3 s) instead of wall time.
-  PC: an empty transcript no longer injects a placeholder prompt into the session —
-  the commit endpoint replies 422 so the device shows a clear failure for re-record.
+- Refreshed the SoftAP provisioning web page into a **8-bit Cyber Arcade control
+  console** to match the device's pixel UI: cyberpunk dark background with a faint
+  neon scan-line grid, amber+cyan neon header with a `:: FOLOPASSPORT :: CONTROL` HUD,
+  three 8-bit pixel-card sections (Wi-Fi Network / API Keys / PTT Token), signal-bar
+  icons for scanned SSIDs, focus-glow inputs with monospaced text, an inline eye
+  toggle for sensitive keys, arcade-style chunky buttons with tactile press-down,
+  and an inline `READY/OFFLINE` device status ping. Save success and reboot pages
+  were re-skinned to match.
 
 - Revamped the **Low Power setting page** into a real, functional **Standby & Screen Timeout configuration** (`demo_low_power.c`):
   users can choose between **30s (Rapid Save)**, **1min (Balanced, default)**, **3min (Extended)**, or **Never (Always-on Clock)**.
