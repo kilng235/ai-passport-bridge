@@ -4,20 +4,20 @@
 
 # 固件产物
 
-本目录包含 FoloToy AI Passport（ESP32-C3 / 8 MB Flash / ESP-IDF 5.5.3）的预编译固件二进制文件，由 `main` 分支最新构建产出，可直接烧录。
+本目录包含 **AI Passport Bridge** 在 FoloToy AI Passport 硬件（ESP32-C3 / 8 MB Flash / ESP-IDF 5.5.3）上的预编译固件二进制文件，由 `main` 分支最新构建产出，可直接烧录。
 
 ## 文件
 
 | 文件 | 大小 | SHA-256 |
 | --- | --- | --- |
-| `FoloToy-AI-Passport-full.bin` | 2.66 MB | `c2a0178e1760ccde00a629a2d18bdcfb2ec70c1e25a9f8e2b135ad5aad803e3f` |
+| `ai-passport-bridge-full.bin` | 2.66 MB | `c2a0178e1760ccde00a629a2d18bdcfb2ec70c1e25a9f8e2b135ad5aad803e3f` |
 
 ## 烧录方法
 
 该 `.bin` 是合并镜像（bootloader + 分区表 + 应用程序），可直接从偏移地址 `0x0` 烧录：
 
 ```bash
-esptool.py --chip esp32c3 --port /dev/ttyUSB0 write_flash 0x0 FoloToy-AI-Passport-full.bin
+esptool.py --chip esp32c3 --port /dev/ttyUSB0 write_flash 0x0 ai-passport-bridge-full.bin
 ```
 
 ## ⚠️ 桌宠资源版权

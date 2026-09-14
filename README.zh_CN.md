@@ -1,10 +1,12 @@
-# FoloToy AI Passport 固件与设计思路
+# AI Passport Bridge（FoloToy AI Passport 固件）
 
 <p align="right">
   <strong>简体中文</strong> · <a href="README.md">English</a>
 </p>
 
-本项目是基于 ESP32-C3 的 **FoloToy AI Passport** 开放式智能硬件固件及完整开发体系。
+本项目是基于 ESP32-C3 的 **FoloToy AI Passport** 硬件之上的 **AI Passport Bridge 固件与设计思路**。
+
+仓库命名为 **ai-passport-bridge**，强调本仓库提供的是连接 **OpenCode / ZCode 等桌面 Agent 与 FoloToy AI Passport 硬件设备的桥接固件**，而非 FoloToy AI Passport 硬件或固件产品本身。
 
 ---
 
@@ -78,23 +80,23 @@
 
 | 文件 | 大小 | SHA-256 |
 | --- | --- | --- |
-| `FoloToy-AI-Passport-full.bin` | 2.66 MB | `c2a0178e1760ccde00a629a2d18bdcfb2ec70c1e25a9f8e2b135ad5aad803e3f` |
+| `ai-passport-bridge-full.bin` | 2.66 MB | `c2a0178e1760ccde00a629a2d18bdcfb2ec70c1e25a9f8e2b135ad5aad803e3f` |
 
 **烧录命令**：
 
 ```bash
-esptool.py --chip esp32c3 --port /dev/ttyUSB0 write_flash 0x0 FoloToy-AI-Passport-full.bin
+esptool.py --chip esp32c3 --port /dev/ttyUSB0 write_flash 0x0 ai-passport-bridge-full.bin
 ```
 
 **完整说明**：[`build/firmware/README.md`](build/firmware/README.md)
 
-**下载入口**：[GitHub Releases → v1.0.0-main](https://github.com/kilng235/folotoy-ai-passport/releases/tag/v1.0.0-main)
+**下载入口**：[GitHub Releases → v1.0.0-bridge](https://github.com/kilng235/ai-passport-bridge/releases/tag/v1.0.0-bridge)
 
 > 也可通过 Git 直接下载：
 >
 > ```bash
-> curl -L -o FoloToy-AI-Passport-full.bin \
->   https://raw.githubusercontent.com/kilng235/folotoy-ai-passport/main/build/firmware/FoloToy-AI-Passport-full.bin
+> curl -L -o ai-passport-bridge-full.bin \
+>   https://raw.githubusercontent.com/kilng235/ai-passport-bridge/main/build/firmware/ai-passport-bridge-full.bin
 > ```
 
 ### ⚠️ 桌宠（Desk-pet）资源版权声明

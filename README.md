@@ -1,10 +1,18 @@
-# FoloToy AI Passport Firmware & Design Architecture
+# AI Passport Bridge (FoloToy AI Passport Firmware)
 
 <p align="right">
   <a href="README.zh_CN.md">简体中文</a> · <strong>English</strong>
 </p>
 
-This repository contains the firmware and complete architecture for the **FoloToy AI Passport**, an open-source wearable AI hardware device based on the ESP32-C3.
+This repository hosts the firmware and complete architecture for **AI Passport
+Bridge**, an OpenCode V2 / ZCode bridge for the **FoloToy AI Passport**
+wearable hardware (ESP32-C3, 8 MB Flash, no PSRAM, ESP-IDF 5.5.3). The
+firmware runs on the FoloToy AI Passport device and exposes a local HTTP / mDNS
+service that desktop Agent tools push notifications to.
+
+The repository name is **ai-passport-bridge** to emphasize that the codebase
+is a **bridge** between local Agents and the Passport device, not the
+FoloToy AI Passport hardware or firmware product itself.
 
 ---
 
@@ -78,23 +86,23 @@ This repository contains the firmware and complete architecture for the **FoloTo
 
 | File | Size | SHA-256 |
 | --- | --- | --- |
-| `FoloToy-AI-Passport-full.bin` | 2.66 MB | `c2a0178e1760ccde00a629a2d18bdcfb2ec70c1e25a9f8e2b135ad5aad803e3f` |
+| `ai-passport-bridge-full.bin` | 2.66 MB | `c2a0178e1760ccde00a629a2d18bdcfb2ec70c1e25a9f8e2b135ad5aad803e3f` |
 
 **Flash command**:
 
 ```bash
-esptool.py --chip esp32c3 --port /dev/ttyUSB0 write_flash 0x0 FoloToy-AI-Passport-full.bin
+esptool.py --chip esp32c3 --port /dev/ttyUSB0 write_flash 0x0 ai-passport-bridge-full.bin
 ```
 
 **Full instructions**: [`build/firmware/README.md`](build/firmware/README.md)
 
-**Download entry**: [GitHub Releases → v1.0.0-main](https://github.com/kilng235/folotoy-ai-passport/releases/tag/v1.0.0-main)
+**Download entry**: [GitHub Releases → v1.0.0-bridge](https://github.com/kilng235/ai-passport-bridge/releases/tag/v1.0.0-bridge)
 
 > Or download directly from the repo:
 >
 > ```bash
-> curl -L -o FoloToy-AI-Passport-full.bin \
->   https://raw.githubusercontent.com/kilng235/folotoy-ai-passport/main/build/firmware/FoloToy-AI-Passport-full.bin
+> curl -L -o ai-passport-bridge-full.bin \
+>   https://raw.githubusercontent.com/kilng235/ai-passport-bridge/main/build/firmware/ai-passport-bridge-full.bin
 > ```
 
 ### ⚠️ Desk-pet Asset Copyright Notice

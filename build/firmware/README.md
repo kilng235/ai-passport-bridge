@@ -4,15 +4,16 @@
 
 # Firmware Artifacts
 
-This directory contains the pre-built firmware binary for the FoloToy AI
-Passport (ESP32-C3, 8 MB Flash, ESP-IDF 5.5.3). It is produced by the latest
-build on `main` and is intended for direct flashing.
+This directory contains the pre-built firmware binary for the **AI Passport
+Bridge** running on the FoloToy AI Passport hardware (ESP32-C3, 8 MB Flash,
+ESP-IDF 5.5.3). It is produced by the latest build on `main` and is intended
+for direct flashing.
 
 ## Files
 
 | File | Size | SHA-256 |
 | --- | --- | --- |
-| `FoloToy-AI-Passport-full.bin` | 2.66 MB | `c2a0178e1760ccde00a629a2d18bdcfb2ec70c1e25a9f8e2b135ad5aad803e3f` |
+| `ai-passport-bridge-full.bin` | 2.66 MB | `c2a0178e1760ccde00a629a2d18bdcfb2ec70c1e25a9f8e2b135ad5aad803e3f` |
 
 ## Usage
 
@@ -20,7 +21,7 @@ The `.bin` is a merged image (bootloader + partition table + application) and
 can be flashed at offset `0x0`:
 
 ```bash
-esptool.py --chip esp32c3 --port /dev/ttyUSB0 write_flash 0x0 FoloToy-AI-Passport-full.bin
+esptool.py --chip esp32c3 --port /dev/ttyUSB0 write_flash 0x0 ai-passport-bridge-full.bin
 ```
 
 ## ⚠️ Asset Copyright
